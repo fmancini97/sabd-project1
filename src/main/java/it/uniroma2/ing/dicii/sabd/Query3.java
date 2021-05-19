@@ -1,6 +1,8 @@
 package it.uniroma2.ing.dicii.sabd;
 
 import org.apache.commons.math3.stat.regression.SimpleRegression;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -11,9 +13,15 @@ import org.apache.spark.mllib.clustering.KMeans;
 import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.Vectors;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
 import scala.Tuple2;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -25,26 +33,41 @@ public class Query3 {
     private final static String FIRSTMAY2021 = "2021-05-01";
     private final static String[] ALGORITHMS = {"KMeans","BisectingKMeans" };
 
-    public static void main(String[] args) {
-        /*  Mettere l'indirizzo del master  */
-        SparkConf sparkConf = new SparkConf().setMaster("local").setAppName("Query 3");
-        JavaSparkContext sparkContext = new JavaSparkContext(sparkConf);
+    public static void main(String[] args) throws ParseException {
 
-        JavaRDD<String> lines = sparkContext.textFile("somministrazioni-vaccini-summary-latest.csv");
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        Date dateFirstMay2021 = simpleDateFormat.parse(FIRSTMAY2021);
 
-        /*  Ottengo [(Regione, Popolazione)]    */
-        JavaPairRDD<String,Double> regionPopulation = sparkContext.textFile("totale-popolazione.csv").mapToPair(line -> {
-            String[] content = line.split(",");
-            return new Tuple2<String, Double>(content[0], Double.parseDouble(content[1]));
+        Logger log = LogManager.getLogger("SABD-PROJECT");
+
+        SparkSession spark = SparkSession
+                .builder()
+                .appName("Query3")
+                //.config("spark.some.config.option", "some-value")
+                .getOrCreate();
+        JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(spark.sparkContext());
+        log.info("Starting processing query");
+        Instant start = Instant.now();
+
+
+        /*  Ottengo [(Regione, Popolazione)] dal file totale-popolazione.parquet */
+        JavaPairRDD<String,Double> regionPopulation = spark.read().parquet("hdfs://hdfs-master:54310"
+                + "/input/totale-popolazione.parquet").toJavaRDD().mapToPair(line -> {
+            return new Tuple2<String, Double>(line.getString(0), (double)line.getLong(1));
         });
 
+
+        Dataset<Row> datasetSummary = spark.read().parquet("hdfs://hdfs-master:54310"
+                + "/input/somministrazioni-vaccini-summary-latest.parquet");
+
+        JavaRDD<Row> rawSummary = datasetSummary.toJavaRDD();
+
+
+
         //Prendo solo i dati precedenti a maggio e stimo quelli del primo maggio
-        lines = lines.filter(line -> {
-            String[] contents = line.split(",");
-            String dateString = contents[0];
-            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        rawSummary = rawSummary.filter(line -> {
+            String dateString = line.getString(0);
             Date date = simpleDateFormat.parse(dateString);
-            Date dateFirstMay2021 = simpleDateFormat.parse(FIRSTMAY2021);
             return date.before(dateFirstMay2021);
         });
 
@@ -52,12 +75,11 @@ public class Query3 {
         * Ottengo [(Regione, (Data, Vaccinazioni))]
         * Per ogni Regione esiste una coppia (Data, Vaccinazioni) per ogni Data
         * */
-        JavaPairRDD<String, Tuple2<String, Double>> regionDateVaccinaions = lines.mapToPair(line ->{
-            String[] contents = line.split(",");
-            String region = contents[20];
-            String date = contents[0];
-            Double vaccinations = Double.parseDouble(contents[2]);
-            return new Tuple2<String, Tuple2<String, Double>>(region, new Tuple2<String, Double>(date, vaccinations));
+        JavaPairRDD<String, Tuple2<Date, Double>> regionDateVaccinaions = rawSummary.mapToPair(line ->{
+            String region = line.getString(20);
+            Date date = simpleDateFormat.parse(line.getString(0));
+            Double vaccinations = (double)line.getLong(2);
+            return new Tuple2<String, Tuple2<Date, Double>>(region, new Tuple2<Date, Double>(date, vaccinations));
         });
 
         /*
@@ -73,20 +95,18 @@ public class Query3 {
          * effettuare un ciclo for ed andare a parallelizzare la computazione su ciascuna regione perché in questo
          * caso sarebbe troppo oneroso per un singolo worker node andare a processare tutti i dati di una sola regione.
          * */
-        JavaPairRDD<String, Iterable<Tuple2<String,Double>>> regionDateVaccinationsIterable = regionDateVaccinaions.groupByKey();
+        JavaPairRDD<String, Iterable<Tuple2<Date,Double>>> regionDateVaccinationsIterable = regionDateVaccinaions.groupByKey();
 
         /*
          * Ottengo coppie [(Regione, VaccinazioniPredette)], una per ogni regione, con vaccinazioni predette
          * il numero di vaccinazioni predette al 1 Giugno 2021 */
         JavaPairRDD<String, Double> regionPredictedVaccinations = regionDateVaccinationsIterable.mapToPair(record -> {
             String region = record._1();
-            Iterable<Tuple2<String,Double>> dateVaccinations = record._2();
+            Iterable<Tuple2<Date,Double>> dateVaccinations = record._2();
 
             SimpleRegression simpleRegression = new SimpleRegression();
-            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
-            for(Tuple2<String, Double> elem: dateVaccinations){
-                String dateString = elem._1();
-                Date date = simpleDateFormat.parse(dateString);
+            for(Tuple2<Date, Double> elem: dateVaccinations){
+                Date date = elem._1();
                 double dateFromEpoch = (double)date.getTime();
                 double vaccinations = elem._2();
 
@@ -108,12 +128,6 @@ public class Query3 {
             return new Tuple2<>(region, vaccinations);
         });
 
-        /**
-         * Per stimare il numero totale sarebbe meglio fare una reduceByKey, però per come ho costruito l'RDD
-         * per fare la predizione non si può più fare reduceByKey
-         *
-         * */
-
         /*
          * Ottengo [(Regione, Vaccinazioni)] per ogni Regione ci sono tante coppie quante sono le date in cui
          * sono stati effettuate delle vaccinazioni fino al 01-06-2021.
@@ -132,13 +146,14 @@ public class Query3 {
          * La stima è per eccesso perché si calcola considerando il  rapporto tra le vaccinazioni e la popolazione, ma
          * così facendo si suppone che (1) tutte le vaccinazioni siano state somministrate a persone diverse e che
          * (2) questo abbia reso tali persone vaccinate. */
+        log.info("149 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
         JavaPairRDD<String,Double> regionPercentage = regionVaccinations.join(regionPopulation).mapToPair(line->{
             Double vaccinations = line._2()._1();
             Double population = line._2()._2();
             Double percentage = vaccinations/population;
             return new Tuple2<String, Double>(line._1(),percentage);
         }).sortByKey();
-
+        log.info("156 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
         /*  Si effettua caching del seguente RDD perché è usato in tutte le iterazioni di kmeans */
         JavaRDD<Vector> vectors = regionPercentage.map(record ->{
             double[] values = new double[1];
@@ -199,9 +214,12 @@ public class Query3 {
         JavaRDD<String> performancesRDD = sparkContext.parallelize(clusteringPerformances);
         JavaRDD<String> resultsRDD = sparkContext.parallelize(clusteringResults);
 
-        performancesRDD.saveAsTextFile("query3clusteringPerformances");
-        resultsRDD.saveAsTextFile("query3clusteringResult");
+        performancesRDD.saveAsTextFile("hdfs://hdfs-master:54310" + "/output/query3clusteringPerformances");
+        resultsRDD.saveAsTextFile("hdfs://hdfs-master:54310" + "/output/query3clusteringResult");
+        Instant end = Instant.now();
+        log.info("Query completed in " + Duration.between(start, end).toMillis() + "ms");
 
-        sparkContext.close();
+        spark.close();
+
     }
 }
