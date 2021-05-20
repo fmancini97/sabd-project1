@@ -83,11 +83,11 @@ public class Query3 {
             return a;
         });
 
-        JavaPairRDD<String, Long> regionDateVaccinationsPred = regionRegression.mapToPair(
+        JavaPairRDD<String, Long> regionVaccinationsPred = regionRegression.mapToPair(
                 line -> new Tuple2<>(line._1, (long) line._2.predict(timestampFirstMay2021)));
 
         JavaPairRDD<String, Long> regionVaccinations = regionDateVaccinations.mapToPair(line ->
-                new Tuple2<>(line._1, line._2._2)).union(regionDateVaccinationsPred);
+                new Tuple2<>(line._1, line._2._2)).union(regionVaccinationsPred);
 
         JavaPairRDD<String, Long> regionVaccinationsTotal = regionVaccinations.reduceByKey(Long::sum);
         JavaPairRDD<String, Vector> regionVaccinationsTotalVector = regionVaccinationsTotal.mapToPair(
