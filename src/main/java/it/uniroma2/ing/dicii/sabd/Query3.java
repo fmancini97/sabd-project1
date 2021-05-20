@@ -1,16 +1,13 @@
 package it.uniroma2.ing.dicii.sabd;
 
+import it.uniroma2.ing.dicii.sabd.utils.Algorithm;
+import it.uniroma2.ing.dicii.sabd.utils.KMeansAlgorithm;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.mllib.clustering.BisectingKMeans;
-import org.apache.spark.mllib.clustering.BisectingKMeansModel;
-import org.apache.spark.mllib.clustering.KMeans;
-import org.apache.spark.mllib.clustering.KMeansModel;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.sql.Dataset;
@@ -18,25 +15,27 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import scala.Tuple2;
 
-import java.text.ParseException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
 
-
 public class Query3 {
 
-    private final static String FIRSTMAY2021 = "2021-05-01";
-    private final static String[] ALGORITHMS = {"KMeans","BisectingKMeans" };
-
-    public static void main(String[] args) throws ParseException {
+    public static void main(String[] args)  {
 
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        Date dateFirstMay2021 = simpleDateFormat.parse(FIRSTMAY2021);
+        Calendar firstMayCal = Calendar.getInstance();
+        firstMayCal.set(Calendar.YEAR, 2021);
+        firstMayCal.set(Calendar.MONTH, Calendar.MAY);
+        firstMayCal.set(Calendar.DAY_OF_MONTH, 1);
+        Date dateFirstMay2021 = firstMayCal.getTime();
+        long timestampFirstMay2021 = dateFirstMay2021.getTime() / 1000;
+
 
         Logger log = LogManager.getLogger("SABD-PROJECT");
 
@@ -52,9 +51,7 @@ public class Query3 {
 
         /*  Ottengo [(Regione, Popolazione)] dal file totale-popolazione.parquet */
         JavaPairRDD<String,Double> regionPopulation = spark.read().parquet("hdfs://hdfs-master:54310"
-                + "/input/totale-popolazione.parquet").toJavaRDD().mapToPair(line -> {
-            return new Tuple2<String, Double>(line.getString(0), (double)line.getLong(1));
-        });
+                + "/input/totale-popolazione.parquet").toJavaRDD().mapToPair(line -> new Tuple2<>(line.getString(0), (double) line.getLong(1)));
 
 
         Dataset<Row> datasetSummary = spark.read().parquet("hdfs://hdfs-master:54310"
@@ -62,25 +59,73 @@ public class Query3 {
 
         JavaRDD<Row> rawSummary = datasetSummary.toJavaRDD();
 
-
-
-        //Prendo solo i dati precedenti a maggio e stimo quelli del primo maggio
-        rawSummary = rawSummary.filter(line -> {
-            String dateString = line.getString(0);
-            Date date = simpleDateFormat.parse(dateString);
-            return date.before(dateFirstMay2021);
-        });
-
         /*
-        * Ottengo [(Regione, (Data, Vaccinazioni))]
-        * Per ogni Regione esiste una coppia (Data, Vaccinazioni) per ogni Data
-        * */
-        JavaPairRDD<String, Tuple2<Date, Double>> regionDateVaccinaions = rawSummary.mapToPair(line ->{
-            String region = line.getString(20);
-            Date date = simpleDateFormat.parse(line.getString(0));
-            Double vaccinations = (double)line.getLong(2);
-            return new Tuple2<String, Tuple2<Date, Double>>(region, new Tuple2<Date, Double>(date, vaccinations));
+         * Ottengo [(Regione, (Data, Vaccinazioni))]
+         * Per ogni Regione esiste una coppia (Data, Vaccinazioni) per ogni Data
+         * Ho eliminato le righe con data successiva al Primo Maggio (da cambiare con il 1 Giugno)
+         * Eseguo il caching // TODO utilizzare il caching precedente
+         * */
+        JavaPairRDD<String, Tuple2<Date, Long>> regionDateVaccinations =
+                rawSummary
+                        .mapToPair(line ->
+                                new Tuple2<>(line.getString(20),
+                                        new Tuple2<>(simpleDateFormat.parse(line.getString(0)), line.getLong(2))))
+                .filter(line -> line._2._1.before(dateFirstMay2021)).cache();
+
+        JavaPairRDD<String, SimpleRegression> regionRegression = regionDateVaccinations.mapToPair(line -> {
+            SimpleRegression simpleRegression = new SimpleRegression();
+            simpleRegression.addData((double) (line._2._1.getTime() / 1000), line._2._2);
+            return new Tuple2<>(line._1, simpleRegression);
         });
+
+        regionRegression = regionRegression.reduceByKey((a,b) -> {
+            a.append(b);
+            return a;
+        });
+
+        JavaPairRDD<String, Long> regionDateVaccinationsPred = regionRegression.mapToPair(
+                line -> new Tuple2<>(line._1, (long) line._2.predict(timestampFirstMay2021)));
+
+        JavaPairRDD<String, Long> regionVaccinations = regionDateVaccinations.mapToPair(line ->
+                new Tuple2<>(line._1, line._2._2)).union(regionDateVaccinationsPred);
+
+        JavaPairRDD<String, Long> regionVaccinationsTotal = regionVaccinations.reduceByKey(Long::sum);
+        JavaPairRDD<String, Vector> regionVaccinationsTotalVector = regionVaccinationsTotal.mapToPair(
+                line -> new Tuple2<>(line._1, Vectors.dense(line._2))).cache();
+
+        JavaRDD<Vector> dataset = regionVaccinationsTotalVector.map(line -> line._2).cache();
+
+
+        for (Algorithm algorithm: Algorithm.values()) {
+            log.info("Algorithm: " + algorithm.toString());
+            try {
+                Class<?> cls = Class.forName(algorithm.getAlgorithmClass());
+                Constructor<?> constructor = cls.getConstructor();
+
+                for (int k = 1; k <= 5; k++) {
+                    KMeansAlgorithm kMeansAlgorithm = (KMeansAlgorithm) constructor.newInstance();
+                    kMeansAlgorithm.train(dataset, k, 10);
+                    JavaPairRDD<String, Integer> regionCluster = regionVaccinationsTotalVector.mapToPair(line -> new Tuple2<>(line._1, kMeansAlgorithm.predict(line._2)));
+                    List<Tuple2<String, Integer>> results = regionCluster.collect();
+                    log.info("K = " + k);
+                    for (Tuple2<String, Integer> result: results) {
+                        log.info(result);
+                    }
+                }
+
+            } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException
+                    | InstantiationException | IllegalAccessException e) {
+                e.printStackTrace();
+            }
+
+
+        }
+
+
+
+
+
+
 
         /*
          * Ottengo [(Regione, [(Data, Vaccinazioni)])
@@ -95,12 +140,12 @@ public class Query3 {
          * effettuare un ciclo for ed andare a parallelizzare la computazione su ciascuna regione perché in questo
          * caso sarebbe troppo oneroso per un singolo worker node andare a processare tutti i dati di una sola regione.
          * */
-        JavaPairRDD<String, Iterable<Tuple2<Date,Double>>> regionDateVaccinationsIterable = regionDateVaccinaions.groupByKey();
+        //JavaPairRDD<String, Iterable<Tuple2<Date,Double>>> regionDateVaccinationsIterable = regionDateVaccinations.groupByKey();
 
         /*
          * Ottengo coppie [(Regione, VaccinazioniPredette)], una per ogni regione, con vaccinazioni predette
          * il numero di vaccinazioni predette al 1 Giugno 2021 */
-        JavaPairRDD<String, Double> regionPredictedVaccinations = regionDateVaccinationsIterable.mapToPair(record -> {
+        /*JavaPairRDD<String, Double> regionPredictedVaccinations = regionDateVaccinationsIterable.mapToPair(record -> {
             String region = record._1();
             Iterable<Tuple2<Date,Double>> dateVaccinations = record._2();
 
@@ -116,28 +161,28 @@ public class Query3 {
             double yPredicted = simpleRegression.predict(xToBePredicted);
 
             return new Tuple2<String,Double>(region, yPredicted);
-        });
+        });*/
 
         /*
          * Ottengo [(Regione, Vaccinazioni)] per ogni Regione ci sono tante coppie quante sono le date in cui
          * sono stati effettuate delle vaccinazioni fino al 31-05-2021.
          * */
-        JavaPairRDD<String, Double> regionVaccinations = regionDateVaccinaions.mapToPair(record -> {
+        /*JavaPairRDD<String, Double> regionVaccinations = regionDateVaccinations.mapToPair(record -> {
             String region = record._1();
             Double vaccinations = record._2()._2();
             return new Tuple2<>(region, vaccinations);
-        });
+        });*/
 
         /*
          * Ottengo [(Regione, Vaccinazioni)] per ogni Regione ci sono tante coppie quante sono le date in cui
          * sono stati effettuate delle vaccinazioni fino al 01-06-2021.
          * */
-        regionVaccinations = regionVaccinations.union(regionPredictedVaccinations);
+        //regionVaccinations = regionVaccinations.union(regionPredictedVaccinations);
 
         /*
          * Ottengo [(Regione, Vaccinazioni)] per ogni Regione si tiene il valore di tutte le vaccinazioni
          * effettuate fino al 01-06-2021 */
-        regionVaccinations = regionVaccinations.reduceByKey((value1, value2) -> value1+value2);
+        //regionVaccinations = regionVaccinations.reduceByKey((value1, value2) -> value1+value2);
 
         /*
          * Ottengo [(Regione, PercentualeVaccinati)] per ogni Regione si tiene la stima per eccesso della percentuale
@@ -146,7 +191,7 @@ public class Query3 {
          * La stima è per eccesso perché si calcola considerando il  rapporto tra le vaccinazioni e la popolazione, ma
          * così facendo si suppone che (1) tutte le vaccinazioni siano state somministrate a persone diverse e che
          * (2) questo abbia reso tali persone vaccinate. */
-        log.info("149 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+        /*log.info("149 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
         JavaPairRDD<String,Double> regionPercentage = regionVaccinations.join(regionPopulation).mapToPair(line->{
             Double vaccinations = line._2()._1();
             Double population = line._2()._2();
@@ -155,7 +200,7 @@ public class Query3 {
         }).sortByKey();
         log.info("156 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
         /*  Si effettua caching del seguente RDD perché è usato in tutte le iterazioni di kmeans */
-        JavaRDD<Vector> vectors = regionPercentage.map(record ->{
+        /*JavaRDD<Vector> vectors = regionPercentage.map(record ->{
             double[] values = new double[1];
             values[0] = record._2();
             return Vectors.dense(values);
@@ -218,6 +263,7 @@ public class Query3 {
         resultsRDD.saveAsTextFile("hdfs://hdfs-master:54310" + "/output/query3clusteringResult");
         Instant end = Instant.now();
         log.info("Query completed in " + Duration.between(start, end).toMillis() + "ms");
+        */
 
         spark.close();
 
