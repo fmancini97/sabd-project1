@@ -1,40 +1,43 @@
 package it.uniroma2.ing.dicii.sabd;
 
-import it.uniroma2.ing.dicii.sabd.utils.ClusterConfig;
 import it.uniroma2.ing.dicii.sabd.utils.ValuesComparator;
-import org.apache.commons.cli.MissingArgumentException;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.sql.SparkSession;
-import org.json.simple.parser.ParseException;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.*;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import scala.Tuple2;
-import scala.Tuple3;
 
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Calendar;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 
 public class Query1 {
     public static void main( String[] args ) {
+
+
         Logger log = LogManager.getLogger("SABD-PROJECT");
         ValuesComparator<Date, String> valuesComparator = new ValuesComparator<>(Comparator.<Date>naturalOrder(), Comparator.<String>naturalOrder());
+        Date firstJanuary = new GregorianCalendar(2021, Calendar.JANUARY, 1).getTime();
+        SimpleDateFormat outputFormat = new SimpleDateFormat("MMMM yyyy", Locale.ITALIAN);
 
-        /*ClusterConfig clusterConfig = null;
+        List<StructField> fields = new ArrayList<>();
+        fields.add(DataTypes.createStructField("data", DataTypes.StringType, false));
+        fields.add(DataTypes.createStructField("regione", DataTypes.StringType, false));
+        fields.add(DataTypes.createStructField("vaccinazioni per centro", DataTypes.LongType, false));
+        StructType resultStruct = DataTypes.createStructType(fields);
+
+        /*
+        ClusterConfig clusterConfig = null;
         try {
             clusterConfig = ClusterConfig.ParseConfig("./config.json");
-        } catch (MissingArgumentException | ParseException | IOException e) {
+        } catch (MissingArgumentException | IOException | ParseException e) {
             log.error("ERRRRRRRRROEEEOEOEOEOOE");
             log.error(e.getMessage());
             System.exit(1);
@@ -52,12 +55,14 @@ public class Query1 {
                 .getOrCreate();
 
         log.info("Starting processing query");
+        String userDirectory = System.getProperty("user.dir");
+        log.info("Current dir: " + userDirectory);
 
         Instant start = Instant.now();
         //JavaRDD<String> rawSummary = sc.textFile(clusterConfig.getHdfsURL()
         //        + "/input/somministrazioni-vaccini-summary-latest.csv");
         Dataset<Row> datasetSummary = spark.read().parquet("hdfs://hdfs-master:54310"
-                + "/input/somministrazioni-vaccini-summary-latest.parquet");
+                + "/sabd/input/somministrazioni-vaccini-summary-latest.parquet");
 
         JavaRDD<Row> rawSummary = datasetSummary.toJavaRDD();
 
@@ -66,8 +71,10 @@ public class Query1 {
             return new Tuple2<>(date, new Tuple2<>(row.getString(1), row.getLong(2)));
         })).sortByKey(true).cache();
 
-        JavaPairRDD<Tuple2<Date, String>, Long> vaccinePerMonthArea = parsedSummary.mapToPair((line) -> {
+        // Filter the elements before the 1st of January
+        parsedSummary = parsedSummary.filter(row -> !row._1.before(firstJanuary));
 
+        JavaPairRDD<Tuple2<Date, String>, Long> vaccinePerMonthArea = parsedSummary.mapToPair((line) -> {
             Calendar cal = Calendar.getInstance();
             cal.setTime(line._1);
             cal.set(Calendar.DAY_OF_MONTH, 1);
@@ -78,7 +85,7 @@ public class Query1 {
                 new Tuple2<>(line._1._2, new Tuple2<>(line._1._1, line._2)));
 
         Dataset<Row> datasetCenters = spark.read().parquet("hdfs://hdfs-master:54310"
-                + "/input/punti-somministrazione-tipologia.parquet");
+                + "/sabd/input/punti-somministrazione-tipologia.parquet");
 
         JavaPairRDD<String, Integer> vaccineCenters = datasetCenters.toJavaRDD().mapToPair((row) ->
                 new Tuple2<> (row.getString(0), 1)).reduceByKey(Integer::sum);
@@ -86,20 +93,28 @@ public class Query1 {
         JavaPairRDD<String, Tuple2<Tuple2<Date, Long>, Integer>> vaccinePerAreaMonthCenters =
                 vaccinePerArea.join(vaccineCenters);
 
-        JavaPairRDD<Tuple2<Date, String>, Long> result = vaccinePerAreaMonthCenters.mapToPair((line) ->
-                new Tuple2<>(new Tuple2<>(line._2._1._1, line._1), line._2._1._2 / line._2._2)).sortByKey(valuesComparator);
+        JavaRDD<Row> result = vaccinePerAreaMonthCenters.mapToPair((line) ->
+                new Tuple2<>(new Tuple2<>(line._2._1._1, line._1), line._2._1._2 / line._2._2))
+                .sortByKey(valuesComparator)
+                .map( line -> RowFactory.create(outputFormat.format(line._1._1), line._1._2, line._2));
 
-        result.saveAsTextFile("hdfs://hdfs-master:54310" + "/output/query1Result");
+
+        Dataset<Row> clusterDF = spark.createDataFrame(result, resultStruct);
+        clusterDF.write()
+                .format("csv")
+                .option("header", true)
+                .mode(SaveMode.Overwrite)
+                .save("hdfs://hdfs-master:54310"
+                        + "/sabd/output/query1Result");
         Instant end = Instant.now();
 
         log.info("Query completed in " + Duration.between(start, end).toMillis() + "ms");
 
-        List<Tuple2<Tuple2<Date, String>, Long>> values = result.collect();
-        log.info("Result:");
-        for (Tuple2<Tuple2<Date, String>, Long> value: values) {
-            log.info(value);
+        try {
+            TimeUnit.MINUTES.sleep(5);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
-
         spark.close();
     }
 }

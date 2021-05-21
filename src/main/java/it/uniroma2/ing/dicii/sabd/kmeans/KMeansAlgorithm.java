@@ -1,4 +1,4 @@
-package it.uniroma2.ing.dicii.sabd.utils;
+package it.uniroma2.ing.dicii.sabd.kmeans;
 
 import org.apache.spark.api.java.JavaRDD;
 

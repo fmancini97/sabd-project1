@@ -45,7 +45,7 @@ ADD config/hdfs-site.xml $HADOOP_HOME/etc/hadoop/hdfs-site.xml
 #RUN chmod 600 /home/hdfs/.ssh/config
 #RUN chown hdfs:hdfs /home/hdfs/.ssh/config
 # 
-ADD ./bootstrap.sh /usr/local/bootstrap.sh
+ADD bootstrap.sh /usr/local/bootstrap.sh
 #RUN chown hdfs:hdfs /usr/local/bootstrap.sh
 RUN chmod 755 /usr/local/bootstrap.sh
 # 
