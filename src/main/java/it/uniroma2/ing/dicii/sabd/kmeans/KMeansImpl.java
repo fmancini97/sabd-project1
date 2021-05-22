@@ -21,7 +21,20 @@ public class KMeansImpl extends KMeansAlgorithm implements Serializable {
 
     @Override
     public Integer predict(Vector point) {
-        if (this.model != null) return model.predict(point);
+        if (this.model != null) return this.model.predict(point);
         else return -1;
     }
+
+    @Override
+    public Double trainingCost() {
+        if (this.model != null) return this.model.trainingCost();
+        else return -1.0;
+    }
+
+    @Override
+    public Double computeCost(JavaRDD<Vector> dataset) {
+        if (this.model != null) return this.model.computeCost(dataset.rdd());
+        else return -1.0;
+    }
+
 }

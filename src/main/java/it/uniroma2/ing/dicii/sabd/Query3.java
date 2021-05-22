@@ -30,10 +30,17 @@ public class Query3 {
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
         Date dateFirstMay2021 = new GregorianCalendar(2021, Calendar.MAY, 1).getTime(); // TODO Cambiare con il primo giugno
         long timestampFirstMay2021 = dateFirstMay2021.getTime() / 1000;
-        List<StructField> fields = new ArrayList<>();
-        fields.add(DataTypes.createStructField("region", DataTypes.StringType, false));
-        fields.add(DataTypes.createStructField("cluster", DataTypes.IntegerType, false));
-        StructType resultStruct = DataTypes.createStructType(fields);
+        List<StructField> resultfields = new ArrayList<>();
+        resultfields.add(DataTypes.createStructField("region", DataTypes.StringType, false));
+        resultfields.add(DataTypes.createStructField("cluster", DataTypes.IntegerType, false));
+        StructType resultStruct = DataTypes.createStructType(resultfields);
+
+        List<StructField> benchmarkFields = new ArrayList<>();
+        benchmarkFields.add(DataTypes.createStructField("algorithm", DataTypes.StringType, false));
+        benchmarkFields.add(DataTypes.createStructField("k", DataTypes.IntegerType, false));
+        benchmarkFields.add(DataTypes.createStructField("training cost", DataTypes.DoubleType, false));
+        benchmarkFields.add(DataTypes.createStructField("WSSSE", DataTypes.DoubleType, false));
+        StructType benchmarkStruct = DataTypes.createStructType(benchmarkFields);
 
         Logger log = LogManager.getLogger("SABD-PROJECT");
 
@@ -149,6 +156,8 @@ public class Query3 {
         JavaRDD<Vector> dataset = regionVaccinationsTotalVector.map(line -> line._2).cache();
 
         List<Tuple3<KMeansType, Integer, JavaRDD<Row>>> results = new ArrayList<>();
+        List<Row> benchmarkResults = new ArrayList<>();
+
         for (KMeansType algorithm: KMeansType.values()) {
             log.info("Algorithm: " + algorithm.toString());
             try {
@@ -161,6 +170,10 @@ public class Query3 {
                             new Tuple2<>(line._1, kMeansAlgorithm.predict(line._2)));
                     JavaRDD<Row> regionClusterResult = regionCluster.map(line -> RowFactory.create(line._1, line._2));
                     results.add(new Tuple3<>(algorithm, k, regionClusterResult));
+                    Row benchmarkResult = RowFactory.create(algorithm.toString(), k,
+                            kMeansAlgorithm.trainingCost(), kMeansAlgorithm.computeCost(dataset));
+                    benchmarkResults.add(benchmarkResult);
+
                     /*List<Tuple2<String, Integer>> results = regionCluster.collect();
                     log.info("K = " + k);
                     for (Tuple2<String, Integer> result: results) {
@@ -175,7 +188,7 @@ public class Query3 {
             }
         }
 
-
+        // Saving results
         for (Tuple3<KMeansType, Integer, JavaRDD<Row>> result: results) {
             Dataset<Row> clusterDF = spark.createDataFrame(result._3(), resultStruct);
             clusterDF.write()
@@ -185,6 +198,21 @@ public class Query3 {
                     .save("hdfs://hdfs-master:54310"
                             + "/sabd/output/query3Results/" + result._1().toString() + "-" + result._2());
         }
+
+        for (Row result: benchmarkResults) {
+            log.info(result);
+        }
+
+        // Saving performance results
+        Dataset<Row> clusterDF = spark.createDataFrame(benchmarkResults, benchmarkStruct);
+        clusterDF.write()
+                .format("csv")
+                .option("header", true)
+                .mode(SaveMode.Overwrite)
+                .save("hdfs://hdfs-master:54310"
+                        + "/sabd/output/query3Benchmark");
+
+
         Instant end = Instant.now();
         log.info("Query completed in " + Duration.between(start, end).toMillis() + "ms");
         try {
