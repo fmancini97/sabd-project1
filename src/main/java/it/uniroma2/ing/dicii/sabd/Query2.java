@@ -1,23 +1,22 @@
 package it.uniroma2.ing.dicii.sabd;
 
+import it.uniroma2.ing.dicii.sabd.utils.Tuple3Comparator;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.Function;
 import org.apache.spark.broadcast.Broadcast;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.*;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import scala.Tuple2;
 import scala.Tuple3;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.Month;
-import java.time.format.TextStyle;
 import java.util.*;
 
 
@@ -27,11 +26,14 @@ public class Query2 {
 
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
         SimpleDateFormat simpleMonthFormat = new SimpleDateFormat("MM");
-        Calendar firstFebCal = Calendar.getInstance();
-        firstFebCal.set(Calendar.YEAR, 2021);
-        firstFebCal.set(Calendar.MONTH, Calendar.FEBRUARY);
-        firstFebCal.set(Calendar.DAY_OF_MONTH, 1);
-        Date dateFirstFeb2021 = firstFebCal.getTime();
+        SimpleDateFormat simpleItalianDateFormat = new SimpleDateFormat("dd-MMMM", Locale.ITALIAN);
+        Date dateFirstFeb2021 = new GregorianCalendar(2021, Calendar.FEBRUARY, 1).getTime();
+        List<StructField> resultfields = new ArrayList<>();
+        resultfields.add(DataTypes.createStructField("data", DataTypes.StringType, false));
+        resultfields.add(DataTypes.createStructField("fascia anagrafica", DataTypes.StringType, false));
+        resultfields.add(DataTypes.createStructField("regione", DataTypes.StringType, false));
+        resultfields.add(DataTypes.createStructField("vaccinazioni previste", DataTypes.IntegerType, false));
+        StructType resultStruct = DataTypes.createStructType(resultfields);
 
         Logger log = LogManager.getLogger("SABD-PROJECT");
 
@@ -46,7 +48,7 @@ public class Query2 {
 
 
         Dataset<Row> datasetSummary = spark.read().parquet("hdfs://hdfs-master:54310"
-                + "/input/somministrazioni-vaccini-latest.parquet");
+                + "/sabd/input/somministrazioni-vaccini-latest.parquet");
 
         JavaRDD<Row> rawSummary = datasetSummary.toJavaRDD();
 
@@ -87,16 +89,10 @@ public class Query2 {
         );
 
 
-        /* Per eliminare le chiavi non duplicate, cioè che hanno un solo valore associato
-        * vedere il seguente sito per altre soluzioni
-        * https://stackoverflow.com/questions/33161499/spark-rdd-remove-records-with-multiple-keys */
         JavaPairRDD<Tuple3<String, String, String>, Integer> counts =
                 (monthRegionAgeDateVaccinations.keys().mapToPair(k -> new Tuple2<>(k,1)))
                         .reduceByKey(Integer::sum);
 
-        /*
-        * JavaPairRDD<Tuple3<String, String, String>, Integer> invalidEntries = counts.filter(record -> record._2<2);
-        * monthRegionAgeDateVaccinations = monthRegionAgeDateVaccinations.subtractByKey(invalidEntries); */
         Broadcast<List<Tuple3<String, String, String>>> notDuplicated = sparkContext.broadcast(counts.filter(record -> record._2 == 1).keys().collect());
         monthRegionAgeDateVaccinations = monthRegionAgeDateVaccinations.filter(record -> !notDuplicated.value().contains(record._1));
 
@@ -115,34 +111,7 @@ public class Query2 {
         });
 
 
-
-
-
-
-        /*
-        JavaPairRDD<Tuple3<String, String, String>, SimpleRegression> monthRegionAgeRegressor =
-                monthRegionAgeDateVaccinations.combineByKey(
-                        record -> {
-                            Date date = record._1;
-                            Double vaccinations = record._2;
-                            SimpleRegression simpleRegression = new SimpleRegression();
-                            simpleRegression.addData((double)date.getTime(), vaccinations);
-                            return simpleRegression;
-                        },
-                        (simpleRegression, record2) -> {
-                            Date date = record2._1;
-                            Double vaccinations = record2._2;
-                            simpleRegression.addData((double)date.getTime(), vaccinations);
-                            return simpleRegression;
-                        },
-                        (record1, record2) -> {
-                            record1.append(record2);
-                            return record1;
-                        }
-                );
-        */
-
-        JavaPairRDD<Double, Tuple3<String, String, String>> dateAgeRegionPredictedVaccinations =
+        JavaPairRDD<Tuple3<Date, String, Double>, String> dateAgePredictedVaccinationsRegion =
                 monthRegionAgeRegressor.mapToPair(record ->{
                     int month = Integer.parseInt(record._1._1());
                     int nextMonth = month % 12 + 1;
@@ -154,83 +123,71 @@ public class Query2 {
                     }
                     Date dateFirstDayNextMonth = simpleDateFormat.parse(stringFirstDayNextMonth);
                     double predictedVaccinations = record._2.predict((double)(dateFirstDayNextMonth).getTime());
-                    Tuple3<String,String,String> newKey = new Tuple3<>(stringFirstDayNextMonth, record._1._2(),record._1._3());
-                    return new Tuple2<>(predictedVaccinations, newKey);
-                }).cache();
+                    Tuple3<Date,String,Double> newKey = new Tuple3<>(dateFirstDayNextMonth, record._1._2(),predictedVaccinations);
+                    String region = record._1._3();
+                    return new Tuple2<>(newKey, region);
+                });
 
+        Tuple3Comparator<Date,String,Double> tuple3Comparator = new Tuple3Comparator<>(Comparator.<Date>naturalOrder(), Comparator.<String>naturalOrder(), Comparator.<Double>naturalOrder());
+        dateAgePredictedVaccinationsRegion = dateAgePredictedVaccinationsRegion.sortByKey(tuple3Comparator,false,1).cache();
 
-        /* Ottengo [(primo giorno prossimo mese, età)]
-         * Le ripetizioni dovute al fatto che esiste una coppia per ogni regione sono eliminate. */
-        JavaRDD<Tuple2<String,String>> dateAgeKeys = dateAgeRegionPredictedVaccinations.map(
+        List<Tuple2<Date,String>> dateAgeKeys = dateAgePredictedVaccinationsRegion.map(
                 record -> {
-                    String date = record._2._1();
-                    String age = record._2._2();
+                    Date date = record._1._1();
+                    String age = record._1._2();
                     return new Tuple2<>(date, age);
                 }
-        ).distinct();
+        ).distinct().collect();
 
 
-        /* Ordino la lista [(primo giorno prossimo mese, età)]*/
-        List<Tuple2<String,String>> dateAgeList = dateAgeKeys.sortBy(new Function<Tuple2<String, String>, String>() {
-            private static final long serialVersionUID = 1L;
+        JavaPairRDD<Tuple2<Tuple3<Date, String, Double>, String>, Long> resultsRDD = null;
+        for(Tuple2<Date,String> key: dateAgeKeys) {
+            JavaPairRDD<Tuple3<Date, String, Double>, String> filteredData = dateAgePredictedVaccinationsRegion.filter(record -> record._1._1().equals(key._1)&&record._1._2().equals(key._2));
+
+            JavaPairRDD<Tuple2<Tuple3<Date, String, Double>, String>, Long> zippedData = filteredData.zipWithIndex();
+            log.info("Valori chiave: " + key.toString());
+            for(Tuple2<Tuple2<Tuple3<Date, String, Double>, String>, Long> elem: zippedData.collect()){
+                log.info(elem);
+            }
+            JavaPairRDD<Tuple2<Tuple3<Date, String, Double>, String>, Long> top5 = zippedData.filter(record -> record._2<5);
+            if(resultsRDD == null)
+                resultsRDD = top5;
+            else
+                resultsRDD = resultsRDD.union(top5);
+        }
+        
+        assert resultsRDD != null;
+        JavaRDD<Row> resultRow = resultsRDD.map(record ->
+            RowFactory.create(simpleItalianDateFormat.format(record._1._1._1()),
+                    record._1._1._2(), record._1._2, record._1._1._3().intValue()));
+
+        Dataset<Row> clusterDF = spark.createDataFrame(resultRow, resultStruct);
+        clusterDF.write()
+                .format("csv")
+                .option("header", true)
+                .mode(SaveMode.Overwrite)
+                .save("hdfs://hdfs-master:54310"
+                        + "/sabd/output/query2Result");
+
+        /*
+        JavaRDD<String> resultRDD = result.mapToPair(record -> record._1)
+                .repartitionAndSortWithinPartitions(new Partitioner() {
+            @Override
+            public int numPartitions() {
+                return 1;
+            }
 
             @Override
-            public String call(Tuple2<String, String> value) {
-                return value._1+value._2;
+            public int getPartition(Object key) {
+                return 0;
             }
-        }, true, 1).collect();
-
-
-        /*Il valore result mi serve per scrivere l'output
-         * valutare gli aspetti di scrittura dell'output ed eventualmente eliminarlo.
-         */
-        StringBuilder result = new StringBuilder();
-        /* Per ogni (primo giorno del mese successivo, età) */
-        for(Tuple2<String,String> key: dateAgeList) {
-
-            /* Seleziono i valori che si riferiscono a quel giorno e quella fascia anagrafica */
-            JavaPairRDD<Double, Tuple3<String, String, String>> tempdateAgeRegionPredictedVaccinations = dateAgeRegionPredictedVaccinations.filter(
-                    record -> {
-                        String dateRecord = record._2._1();
-                        String ageRecord = record._2._2();
-                        String dateKey = key._1;
-                        String ageKey = key._2;
-                        return dateRecord.equalsIgnoreCase(dateKey) && ageRecord.equals(ageKey);
-                    }
-            );
-            /* Ottengo la top5 dei valori che si riferiscono a quel giorno e quella fascia anagrafica*/
-            List<Tuple2<Double, Tuple3<String, String, String>>> tempTop5 = tempdateAgeRegionPredictedVaccinations.sortByKey(false).take(5);
-
-            /*  Ciclo per la scrittura dell'output
-             * valutare gli aspetti di scrittura dell'output ed eventualmente eliminarlo.
-             * */
-            for(Tuple2<Double, Tuple3<String, String, String>> elem: tempTop5){
-                String date = elem._2._1();
-                String monthAsString = Month.of(Integer.parseInt(date.split("-")[1]))
-                        .getDisplayName(TextStyle.FULL_STANDALONE, Locale.ITALIAN);
-                date = "1 " + monthAsString + " 2021";
-                String age = elem._2._2();
-                String region = elem._2._3();
-                int vaccinations = elem._1.intValue();
-                result.append(date).append(",").append(age).append(",").append(region).append(",").append(vaccinations).append("\n");
-            }
-
-        }
-        dateAgeRegionPredictedVaccinations.unpersist();
-
-        JavaRDD<String> rddResult = sparkContext.parallelize(Arrays.asList(result.toString().split("\n")));
-        rddResult.saveAsTextFile("hdfs://hdfs-master:54310" + "/output/query2Result");
-
+        }, tuple3Comparator)/*
+*/
         Instant end = Instant.now();
         log.info("Query completed in " + Duration.between(start, end).toMillis() + "ms");
 
-        log.info("Result:");
-        String[] lines = result.toString().split("\n");
-        for(String line: lines){
-            log.info(line);
-        }
-
         spark.close();
+
     }
 
 }

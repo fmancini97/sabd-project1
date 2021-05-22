@@ -1,6 +1,6 @@
 package it.uniroma2.ing.dicii.sabd;
 
-import it.uniroma2.ing.dicii.sabd.utils.ValuesComparator;
+import it.uniroma2.ing.dicii.sabd.utils.Tuple2Comparator;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
@@ -23,7 +23,7 @@ public class Query1 {
 
 
         Logger log = LogManager.getLogger("SABD-PROJECT");
-        ValuesComparator<Date, String> valuesComparator = new ValuesComparator<>(Comparator.<Date>naturalOrder(), Comparator.<String>naturalOrder());
+        Tuple2Comparator<Date, String> valuesComparator = new Tuple2Comparator<>(Comparator.<Date>naturalOrder(), Comparator.<String>naturalOrder());
         Date firstJanuary = new GregorianCalendar(2021, Calendar.JANUARY, 1).getTime();
         SimpleDateFormat outputFormat = new SimpleDateFormat("MMMM yyyy", Locale.ITALIAN);
 

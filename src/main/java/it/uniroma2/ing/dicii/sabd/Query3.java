@@ -59,11 +59,7 @@ public class Query3 {
                 new Tuple2<>(line.getString(0).split(" /")[0],
                         line.getLong(1)));
 
-        /*
-        List<Tuple2<String, Long>> regionPopulationLists = regionPopulation.collect();
-        for (Tuple2<String, Long> regionPopulationList: regionPopulationLists) {
-            log.info(regionPopulationList);
-        }*/
+
 
         Dataset<Row> datasetSummary = spark.read().parquet("hdfs://hdfs-master:54310"
                 + "/sabd/input/somministrazioni-vaccini-summary-latest.parquet");

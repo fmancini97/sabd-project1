@@ -40,7 +40,9 @@ services:
       - HDFS_MODE=master
       - 'HDFS_WORKERS=hdfs-worker-1,hdfs-worker-2,hdfs-worker-3'
     depends_on:
-      - 'hdfs-worker'
+      - hdfs-worker-1
+      - hdfs-worker-2
+      - hdfs-worker-3
     volumes:
       - ./data:/data
     ports:

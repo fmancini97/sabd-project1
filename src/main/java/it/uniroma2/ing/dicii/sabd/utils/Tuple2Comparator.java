@@ -5,12 +5,12 @@ import scala.Tuple2;
 import java.io.Serializable;
 import java.util.Comparator;
 
-public class ValuesComparator<K,V> implements Comparator<Tuple2<K, V>>, Serializable {
+public class Tuple2Comparator<K,V> implements Comparator<Tuple2<K, V>>, Serializable {
 
-    private Comparator<K> comparatorK;
-    private Comparator<V> comparatorV;
+    private final Comparator<K> comparatorK;
+    private final Comparator<V> comparatorV;
 
-    public ValuesComparator(Comparator<K> comparatorK, Comparator<V> comparatorV) {
+    public Tuple2Comparator(Comparator<K> comparatorK, Comparator<V> comparatorV) {
         this.comparatorK = comparatorK;
         this.comparatorV = comparatorV;
     }
