@@ -1,4 +1,4 @@
-package it.uniroma2.ing.dicii.sabd.utils;
+package it.uniroma2.ing.dicii.sabd.utils.comparators;
 
 
 import scala.Tuple3;

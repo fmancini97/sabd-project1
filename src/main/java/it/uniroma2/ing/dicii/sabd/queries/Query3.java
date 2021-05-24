@@ -1,7 +1,9 @@
-package it.uniroma2.ing.dicii.sabd;
+package it.uniroma2.ing.dicii.sabd.queries;
 
 import it.uniroma2.ing.dicii.sabd.kmeans.KMeansAlgorithm;
+import it.uniroma2.ing.dicii.sabd.kmeans.KMeansBenchmark;
 import it.uniroma2.ing.dicii.sabd.kmeans.KMeansType;
+import it.uniroma2.ing.dicii.sabd.utils.io.HdfsIO;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -9,72 +11,86 @@ import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.Vectors;
-import org.apache.spark.sql.*;
-import org.apache.spark.sql.types.*;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.RowFactory;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
 import scala.Tuple2;
 import scala.Tuple3;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 
-public class Query3 {
+public class Query3 implements Query {
 
-    public static void main(String[] args)  {
+    private static final Date dateFirstMay2021 = new GregorianCalendar(2021, Calendar.MAY, 1).getTime();
+    private static final long timestampFirstMay2021 = dateFirstMay2021.getTime() / 1000;
+    private static final SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd");
+    private static final String vaccineAdministrationSummaryFile = "somministrazioni-vaccini-summary-latest.parquet";
+    private static final String populationPerRegion = "totale-popolazione.parquet";
+    private static final String resultDir = "query3Result";
+    private static final String benchmarkFile = "query3Benchmark.csv";
 
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        Date dateFirstMay2021 = new GregorianCalendar(2021, Calendar.MAY, 1).getTime(); // TODO Cambiare con il primo giugno
-        long timestampFirstMay2021 = dateFirstMay2021.getTime() / 1000;
-        List<StructField> resultfields = new ArrayList<>();
-        resultfields.add(DataTypes.createStructField("region", DataTypes.StringType, false));
-        resultfields.add(DataTypes.createStructField("cluster", DataTypes.IntegerType, false));
-        StructType resultStruct = DataTypes.createStructType(resultfields);
+    private static final StructType resultStruct = DataTypes.createStructType(Arrays.asList(
+                    DataTypes.createStructField("region", DataTypes.StringType, false),
+                    DataTypes.createStructField("cluster", DataTypes.IntegerType, false)));
 
-        List<StructField> benchmarkFields = new ArrayList<>();
-        benchmarkFields.add(DataTypes.createStructField("algorithm", DataTypes.StringType, false));
-        benchmarkFields.add(DataTypes.createStructField("k", DataTypes.IntegerType, false));
-        benchmarkFields.add(DataTypes.createStructField("training cost", DataTypes.DoubleType, false));
-        benchmarkFields.add(DataTypes.createStructField("WSSSE", DataTypes.DoubleType, false));
-        StructType benchmarkStruct = DataTypes.createStructType(benchmarkFields);
 
-        Logger log = LogManager.getLogger("SABD-PROJECT");
+    private final Logger log;
 
-        SparkSession spark = SparkSession
-                .builder()
-                .appName("Query3")
-                .getOrCreate();
+    private QueryContext queryContext;
+    private HdfsIO hdfsIO;
 
+    public Query3() {
+        this.log = LogManager.getLogger(getClass().getSimpleName());
+    }
+
+    @Override
+    public void configure(QueryContext queryContext, HdfsIO hdfsIO) {
+        this.queryContext = queryContext;
+        this.hdfsIO = hdfsIO;
+    }
+
+    @Override
+    public Long execute() {
         log.info("Starting processing query");
-
         Instant start = Instant.now();
 
+        JavaRDD<Row> regionPopulationRaw = this.hdfsIO.readParquet(populationPerRegion);
+
         /*  Ottengo [(Regione, Popolazione)] dal file totale-popolazione.parquet */
-        JavaPairRDD<String,Long> regionPopulation = spark.read().parquet("hdfs://hdfs-master:54310"
-                + "/sabd/input/totale-popolazione.parquet").toJavaRDD().mapToPair(line ->
-                new Tuple2<>(line.getString(0).split(" /")[0],
-                        line.getLong(1)));
+        JavaPairRDD<String,Long> regionPopulation = regionPopulationRaw.mapToPair(line ->
+                new Tuple2<>(line.getString(0).split(" /")[0], line.getLong(1)));
 
+        JavaPairRDD<Date, Tuple2<String, Long>> parsedSummary = this.queryContext.getVaccineAdministrationSummary();
 
+        if (parsedSummary == null) {
+            log.info("Not cached");
+            JavaRDD<Row> rawSummary = this.hdfsIO.readParquet(vaccineAdministrationSummaryFile);
 
-        Dataset<Row> datasetSummary = spark.read().parquet("hdfs://hdfs-master:54310"
-                + "/sabd/input/somministrazioni-vaccini-summary-latest.parquet");
+            parsedSummary = rawSummary
+                    .mapToPair((row ->
+                            new Tuple2<>(inputFormat.parse(row.getString(0)),
+                                    new Tuple2<>(row.getString(20).split(" /")[0], row.getLong(2)))))
+                    .sortByKey(true);
 
-        JavaRDD<Row> rawSummary = datasetSummary.toJavaRDD();
+            parsedSummary = this.queryContext.cacheVaccineAdministration(parsedSummary);
+        }
 
         /*
          * Ottengo [(Regione, (Data, Vaccinazioni))]
          * Per ogni Regione esiste una coppia (Data, Vaccinazioni) per ogni Data
          * Ho eliminato le righe con data successiva al Primo Maggio (da cambiare con il 1 Giugno)
-         * Eseguo il caching // TODO utilizzare il caching precedente
+         * Eseguo il caching
          * */
-        JavaPairRDD<String, Tuple2<Date, Long>> regionDateVaccinations = rawSummary.mapToPair(line ->
-                                new Tuple2<>(line.getString(20).split(" /")[0],
-                                        new Tuple2<>(simpleDateFormat.parse(line.getString(0)), line.getLong(2))))
+        JavaPairRDD<String, Tuple2<Date, Long>> regionDateVaccinations = parsedSummary.mapToPair(line ->
+                new Tuple2<>(line._2._1, new Tuple2<>(line._1, line._2._2)))
                 .filter(line -> line._2._1.before(dateFirstMay2021))
                 .cache();
 
@@ -89,6 +105,7 @@ public class Query3 {
             simpleRegression.addData((double) (line._2._1.getTime() / 1000), line._2._2);
             return new Tuple2<>(line._1, simpleRegression);
         });
+
         /*
          * Ottengo [(Regione, RegressioneLineare)]
          * Per ciascuna Regione ottengo una sola regressione lineare che stima il numero di vaccinazioni giornaliere.
@@ -141,18 +158,10 @@ public class Query3 {
                 .sortByKey()
                 .cache();
 
-        /*
-        List<Tuple2<String, Double>> results1 = regionVaccinationsPercentage.collect();
-
-        log.info("Region Percentage:");
-        for (Tuple2<String, Double> result1 : results1) {
-            log.info(result1);
-        }*/
-
         JavaRDD<Vector> dataset = regionVaccinationsTotalVector.map(line -> line._2).cache();
 
         List<Tuple3<KMeansType, Integer, JavaRDD<Row>>> results = new ArrayList<>();
-        List<Row> benchmarkResults = new ArrayList<>();
+        List<KMeansBenchmark> benchmarkResults = new ArrayList<>();
 
         for (KMeansType algorithm: KMeansType.values()) {
             log.info("Algorithm: " + algorithm.toString());
@@ -166,15 +175,10 @@ public class Query3 {
                             new Tuple2<>(line._1, kMeansAlgorithm.predict(line._2)));
                     JavaRDD<Row> regionClusterResult = regionCluster.map(line -> RowFactory.create(line._1, line._2));
                     results.add(new Tuple3<>(algorithm, k, regionClusterResult));
-                    Row benchmarkResult = RowFactory.create(algorithm.toString(), k,
+                    KMeansBenchmark benchmarkResult = new KMeansBenchmark(algorithm, k,
                             kMeansAlgorithm.trainingCost(), kMeansAlgorithm.computeCost(dataset));
                     benchmarkResults.add(benchmarkResult);
 
-                    /*List<Tuple2<String, Integer>> results = regionCluster.collect();
-                    log.info("K = " + k);
-                    for (Tuple2<String, Integer> result: results) {
-                        log.info(result);
-                    }*/
                 }
             } catch (ClassNotFoundException e) {
                 log.error("Class not found: " + e.getMessage());
@@ -184,38 +188,24 @@ public class Query3 {
             }
         }
 
-        // Saving results
+        // Saving query results
         for (Tuple3<KMeansType, Integer, JavaRDD<Row>> result: results) {
-            Dataset<Row> clusterDF = spark.createDataFrame(result._3(), resultStruct);
-            clusterDF.write()
-                    .format("csv")
-                    .option("header", true)
-                    .mode(SaveMode.Overwrite)
-                    .save("hdfs://hdfs-master:54310"
-                            + "/sabd/output/query3Results/" + result._1().toString() + "-" + result._2());
+            this.hdfsIO.saveRDDasCSV(result._3(), resultStruct,
+                    resultDir + "/" + result._1().toString() + "-" + result._2());
         }
 
-        for (Row result: benchmarkResults) {
-            log.info(result);
+        // Saving Benchmark results
+        try {
+            this.hdfsIO.saveStructAsCSV(benchmarkResults, benchmarkFile);
+        } catch (IOException e) {
+           log.error("Error during benchmark saving: " + e.getMessage());
         }
-
-        // Saving performance results
-        Dataset<Row> clusterDF = spark.createDataFrame(benchmarkResults, benchmarkStruct);
-        clusterDF.write()
-                .format("csv")
-                .option("header", true)
-                .mode(SaveMode.Overwrite)
-                .save("hdfs://hdfs-master:54310"
-                        + "/sabd/output/query3Benchmark");
-
 
         Instant end = Instant.now();
-        log.info("Query completed in " + Duration.between(start, end).toMillis() + "ms");
-        try {
-            TimeUnit.MINUTES.sleep(5);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        spark.close();
+        Long duration = Duration.between(start, end).toMillis();
+        log.info("Query completed in " + duration + "ms");
+
+        return duration;
+
     }
 }
