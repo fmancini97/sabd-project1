@@ -66,7 +66,7 @@ public class Query3 implements Query {
 
         /*  Ottengo [(Regione, Popolazione)] dal file totale-popolazione.parquet */
         JavaPairRDD<String,Long> regionPopulation = regionPopulationRaw.mapToPair(line ->
-                new Tuple2<>(line.getString(0).split(" /")[0], line.getLong(1)));
+                new Tuple2<>(line.getString(0).split(" /")[0], Long.parseLong(line.getString(1))));
 
         JavaPairRDD<Date, Tuple2<String, Long>> parsedSummary = this.queryContext.getVaccineAdministrationSummary();
 
@@ -77,7 +77,7 @@ public class Query3 implements Query {
             parsedSummary = rawSummary
                     .mapToPair((row ->
                             new Tuple2<>(inputFormat.parse(row.getString(0)),
-                                    new Tuple2<>(row.getString(20).split(" /")[0], row.getLong(2)))))
+                                    new Tuple2<>(row.getString(2).split(" /")[0], Long.parseLong(row.getString(1)) ))))
                     .sortByKey(true);
 
             parsedSummary = this.queryContext.cacheVaccineAdministration(parsedSummary);

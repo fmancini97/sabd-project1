@@ -43,10 +43,8 @@ services:
       - hdfs-worker-1
       - hdfs-worker-2
       - hdfs-worker-3
-    volumes:
-      - ./data:/data
     ports:
-      - 54310:54310
+      - 9870:9870
 
   hdfs-worker-1:
     build:
@@ -74,4 +72,7 @@ services:
       - '8085:8080' # Web UI
     volumes:
       - ./hdfs/config:/hdfs/config/
-  #    - ./nifi/templates:/opt/nifi/nifi-current/conf
+      - nifi:/opt/nifi/nifi-current/conf
+
+volumes:
+  nifi:

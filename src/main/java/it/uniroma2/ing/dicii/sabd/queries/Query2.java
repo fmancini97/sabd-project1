@@ -64,9 +64,9 @@ public class Query2 implements Query {
         /*  Ottengo [(data, regione, età), vaccini]*/
         JavaPairRDD<Tuple3<Date, String, String>, Double> dateRegionAgeVaccinations = rawSummary.mapToPair(line ->{
             Date date = inputFormat.parse(line.getString(0));
-            String region = line.getString(21);
-            String age = line.getString(3);
-            Double vaccinations = (double)line.getLong(5);
+            String region = line.getString(3);
+            String age = line.getString(1);
+            Double vaccinations = Double.parseDouble(line.getString(2));
             return new Tuple2<>(new Tuple3<>(date,age,region), vaccinations);
         });
 
@@ -137,10 +137,11 @@ public class Query2 implements Query {
                     Date date = record._1._1();
                     String age = record._1._2();
                     return new Tuple2<>(date, age);
-                }
-        ).distinct().sortBy(new Function<Tuple2<Date, String>, Object>() { //TODO
-            String dateString = inputFormat.format()
-        }),true,1 ).collect();
+                })
+                .distinct()
+                .sortBy((Function<Tuple2<Date, String>, String>) value -> inputFormat.format(value._1())+value._2(),
+                        true, 1)
+                .collect();
 
         JavaPairRDD<Tuple2<Tuple3<Date, String, Double>, String>, Long> resultsRDD = null;
         for(Tuple2<Date,String> key: dateAgeKeys) {

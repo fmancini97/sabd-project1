@@ -57,7 +57,7 @@ public class Query1 implements Query {
             parsedSummary = rawSummary
                     .mapToPair((row ->
                             new Tuple2<>(inputFormat.parse(row.getString(0)),
-                                    new Tuple2<>(row.getString(20).split(" /")[0], row.getLong(2)))))
+                                    new Tuple2<>(row.getString(2).split(" /")[0], Long.parseLong(row.getString(1))))))
                     .sortByKey(true);
 
             parsedSummary = this.queryContext.cacheVaccineAdministration(parsedSummary);
@@ -79,7 +79,7 @@ public class Query1 implements Query {
         JavaRDD<Row> datasetCenters = this.hdfsIO.readParquet(vaccineCentersFile);
 
         JavaPairRDD<String, Integer> vaccineCenters = datasetCenters.mapToPair((row) ->
-                new Tuple2<> (row.getString(6).split(" /")[0], 1)).reduceByKey(Integer::sum);
+                new Tuple2<> (row.getString(0).split(" /")[0], 1)).reduceByKey(Integer::sum);
 
         JavaPairRDD<String, Tuple2<Tuple2<Date, Long>, Integer>> vaccinePerAreaMonthCenters =
                 vaccinePerArea.join(vaccineCenters);
