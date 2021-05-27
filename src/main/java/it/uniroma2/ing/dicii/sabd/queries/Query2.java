@@ -7,6 +7,7 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.function.Function;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.types.DataTypes;
@@ -137,7 +138,9 @@ public class Query2 implements Query {
                     String age = record._1._2();
                     return new Tuple2<>(date, age);
                 }
-        ).distinct().collect();
+        ).distinct().sortBy(new Function<Tuple2<Date, String>, Object>() { //TODO
+            String dateString = inputFormat.format()
+        }),true,1 ).collect();
 
         JavaPairRDD<Tuple2<Tuple3<Date, String, Double>, String>, Long> resultsRDD = null;
         for(Tuple2<Date,String> key: dateAgeKeys) {

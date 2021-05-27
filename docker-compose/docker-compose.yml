@@ -66,3 +66,12 @@ services:
     image: fmancini/hdfs
     environment:
       - HDFS_MODE=worker
+      
+  nifi:
+    image: docker.io/apache/nifi
+    container_name: nifi
+    ports: 
+      - '8085:8080' # Web UI
+    volumes:
+      - ./hdfs/config:/hdfs/config/
+  #    - ./nifi/templates:/opt/nifi/nifi-current/conf
