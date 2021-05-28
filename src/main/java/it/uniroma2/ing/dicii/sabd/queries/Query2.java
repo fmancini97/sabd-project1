@@ -2,6 +2,7 @@ package it.uniroma2.ing.dicii.sabd.queries;
 
 import it.uniroma2.ing.dicii.sabd.utils.comparators.Tuple3Comparator;
 import it.uniroma2.ing.dicii.sabd.utils.io.HdfsIO;
+import it.uniroma2.ing.dicii.sabd.utils.wrappers.SimpleRegressionWrapper;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -97,10 +98,10 @@ public class Query2 implements Query {
                         }
                 );
 
-        JavaPairRDD<Tuple3<String, String, String>, SimpleRegression> monthRegionAgeRegressor =
+        JavaPairRDD<Tuple3<String, String, String>, SimpleRegressionWrapper> monthRegionAgeRegressor =
                 monthRegionAgeDateVaccinations.mapToPair(
                         line -> {
-                            SimpleRegression simpleRegression = new SimpleRegression();
+                            SimpleRegressionWrapper simpleRegression = new SimpleRegressionWrapper();
                             simpleRegression.addData((double) (line._2._1.getTime()), line._2._2);
                             return new Tuple2<>(line._1, simpleRegression);
                         });
@@ -108,7 +109,7 @@ public class Query2 implements Query {
         monthRegionAgeRegressor = monthRegionAgeRegressor.reduceByKey((a,b) -> {
             a.append(b);
             return a;
-        }).filter(line -> line._2.getN() >= 2); // Filtering regressions which have less than 2 observations
+        }).filter(line -> line._2.getCounter()>=2); // Filtering regressions which have less than 2 observations
 
 
         JavaPairRDD<Tuple3<Date, String, Double>, String> dateAgePredictedVaccinationsRegion =
