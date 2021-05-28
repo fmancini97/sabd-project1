@@ -72,7 +72,7 @@ services:
       - '8085:8080' # Web UI
     volumes:
       - ./hdfs/config:/hdfs/config/
-      - nifi:/opt/nifi/nifi-current/conf
-
+      - ./nifi/conf:/opt/nifi/nifi-current/conf
+      - nifi-archive:/opt/nifi/nifi-current/conf/archive
 volumes:
-  nifi:
+  nifi-archive:
