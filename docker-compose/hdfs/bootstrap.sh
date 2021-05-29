@@ -26,11 +26,14 @@ if [[ "${HDFS_MODE}" == "worker" ]]; then
 elif [[ "${HDFS_MODE}" == "master" ]]; then
 	echo "Starting master node";
 	service ssh start;
-	hdfs namenode -format;
+	echo "N" | hdfs namenode -format;
 	$HADOOP_HDFS_HOME/sbin/start-dfs.sh;
 	hdfs dfs -mkdir /sabd
 	hdfs dfs -mkdir /sabd/input
 	hdfs dfs -mkdir /sabd/output
+	hdfs dfs -mkdir /sabd/output/query1Result
+	hdfs dfs -mkdir /sabd/output/query2Result
+	hdfs dfs -mkdir /sabd/output/query3Result
 	hdfs dfs -chown spark:spark /sabd/output
 	hdfs dfs -chown nifi:nifi /sabd/input
 	echo "Master node is up and running"
