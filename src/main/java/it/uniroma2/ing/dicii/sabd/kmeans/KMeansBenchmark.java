@@ -5,11 +5,11 @@ import it.uniroma2.ing.dicii.sabd.utils.io.CSVAble;
 public class KMeansBenchmark implements CSVAble {
     private KMeansType kMeansType;
     private Integer k;
-    private Double trainingCost;
+    private Long trainingCost;
     private Double wssse;
 
 
-    public KMeansBenchmark(KMeansType kMeansType, Integer k, Double trainingCost, Double wssse) {
+    public KMeansBenchmark(KMeansType kMeansType, Integer k, Long trainingCost, Double wssse) {
         this.kMeansType = kMeansType;
         this.k = k;
         this.trainingCost = trainingCost;
@@ -33,11 +33,11 @@ public class KMeansBenchmark implements CSVAble {
         this.k = k;
     }
 
-    public Double getTrainingCost() {
+    public Long getTrainingCost() {
         return trainingCost;
     }
 
-    public void setTrainingCost(Double trainingCost) {
+    public void setTrainingCost(Long trainingCost) {
         this.trainingCost = trainingCost;
     }
 
@@ -57,6 +57,6 @@ public class KMeansBenchmark implements CSVAble {
 
     @Override
     public String getHeader() {
-        return "algorithm,k,training cost, WSSSE";
+        return "algoritmo,k,costo addestramento (ms), wssse";
     }
 }
