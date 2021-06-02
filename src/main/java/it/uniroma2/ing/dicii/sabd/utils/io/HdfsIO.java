@@ -18,12 +18,13 @@ import scala.Tuple3;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
 
-public class HdfsIO {
+public class HdfsIO{
     private static final String projectDir = "/sabd";
     private static final String inputDir = projectDir + "/input";
     private static final String outputDir = projectDir + "/output";
@@ -70,8 +71,12 @@ public class HdfsIO {
         bufferedWriter.close();
     }
 
-    public JavaRDD<Row> readParquet(String filename) {
-        Dataset<Row> dataset = this.sparkSession.read().parquet(this.hdfsUrl + inputDir + "/" + filename);
+    public Dataset<Row> readParquetAsDataframe(String filename){
+        return this.sparkSession.read().parquet(this.hdfsUrl + inputDir + "/" + filename);
+    }
+
+    public JavaRDD<Row> readParquetAsRDD(String filename) {
+        Dataset<Row> dataset = this.readParquetAsDataframe(filename);
         return dataset.toJavaRDD();
     }
 

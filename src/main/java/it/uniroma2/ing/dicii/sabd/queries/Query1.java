@@ -52,7 +52,7 @@ public class Query1 implements Query {
         JavaPairRDD<Date, Tuple2<String, Long>> parsedSummary = this.queryContext.getVaccineAdministrationSummary();
 
         if (parsedSummary == null) {
-            JavaRDD<Row> rawSummary = this.hdfsIO.readParquet(vaccineAdministrationSummaryFile);
+            JavaRDD<Row> rawSummary = this.hdfsIO.readParquetAsRDD(vaccineAdministrationSummaryFile);
 
             parsedSummary = rawSummary
                     .mapToPair((row ->
@@ -65,6 +65,7 @@ public class Query1 implements Query {
 
         parsedSummary = parsedSummary.filter(row -> !row._1.before(firstJanuary));
 
+
         JavaPairRDD<Tuple2<Date, String>, Long> vaccinePerMonthArea = parsedSummary.mapToPair((line) -> {
             Calendar cal = Calendar.getInstance();
             cal.setTime(line._1);
@@ -76,7 +77,7 @@ public class Query1 implements Query {
                 new Tuple2<>(line._1._2, new Tuple2<>(line._1._1, line._2)));
 
 
-        JavaRDD<Row> datasetCenters = this.hdfsIO.readParquet(vaccineCentersFile);
+        JavaRDD<Row> datasetCenters = this.hdfsIO.readParquetAsRDD(vaccineCentersFile);
 
         JavaPairRDD<String, Integer> vaccineCenters = datasetCenters.mapToPair((row) ->
                 new Tuple2<> (row.getString(0).split(" /")[0], 1)).reduceByKey(Integer::sum);

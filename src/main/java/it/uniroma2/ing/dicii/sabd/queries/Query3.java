@@ -29,8 +29,8 @@ import java.util.*;
 
 public class Query3 implements Query {
 
-    private static final Date dateFirstMay2021 = new GregorianCalendar(2021, Calendar.MAY, 1).getTime();
-    private static final long timestampFirstMay2021 = dateFirstMay2021.getTime() / 1000;
+    private static final Date dateFirstJune2021 = new GregorianCalendar(2021, Calendar.JUNE, 1).getTime();
+    private static final long timestampFirstJune2021 = dateFirstJune2021.getTime() / 1000;
     private static final SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd");
     private static final String vaccineAdministrationSummaryFile = "somministrazioni-vaccini-summary-latest.parquet";
     private static final String populationPerRegion = "totale-popolazione.parquet";
@@ -38,6 +38,10 @@ public class Query3 implements Query {
     private static final String benchmarkFile = "query3Benchmark.csv";
 
     private static final StructType resultStruct = DataTypes.createStructType(Arrays.asList(
+                //    DataTypes.createStructField("algoritmo", DataTypes.StringType, false),
+                //    DataTypes.createStructField("k", DataTypes.IntegerType, false),
+                //    DataTypes.createStructField("stima percentuale popolazione vaccinata", DataTypes.DoubleType, false),
+                //    DataTypes.createStructField("stima numero vaccinazioni", DataTypes.LongType, false),
                     DataTypes.createStructField("region", DataTypes.StringType, false),
                     DataTypes.createStructField("cluster", DataTypes.IntegerType, false)));
 
@@ -62,7 +66,7 @@ public class Query3 implements Query {
         log.info("Starting processing query");
         Instant start = Instant.now();
 
-        JavaRDD<Row> regionPopulationRaw = this.hdfsIO.readParquet(populationPerRegion);
+        JavaRDD<Row> regionPopulationRaw = this.hdfsIO.readParquetAsRDD(populationPerRegion);
 
         /*  Ottengo [(Regione, Popolazione)] dal file totale-popolazione.parquet */
         JavaPairRDD<String,Long> regionPopulation = regionPopulationRaw.mapToPair(line ->
@@ -72,7 +76,7 @@ public class Query3 implements Query {
 
         if (parsedSummary == null) {
             log.info("Not cached");
-            JavaRDD<Row> rawSummary = this.hdfsIO.readParquet(vaccineAdministrationSummaryFile);
+            JavaRDD<Row> rawSummary = this.hdfsIO.readParquetAsRDD(vaccineAdministrationSummaryFile);
 
             parsedSummary = rawSummary
                     .mapToPair((row ->
@@ -91,7 +95,7 @@ public class Query3 implements Query {
          * */
         JavaPairRDD<String, Tuple2<Date, Long>> regionDateVaccinations = parsedSummary.mapToPair(line ->
                 new Tuple2<>(line._2._1, new Tuple2<>(line._1, line._2._2)))
-                .filter(line -> line._2._1.before(dateFirstMay2021))
+                .filter(line -> line._2._1.before(dateFirstJune2021))
                 .cache();
 
         /*
@@ -123,7 +127,7 @@ public class Query3 implements Query {
          * il numero di vaccinazioni predette al 1 Giugno 2021
          */
         JavaPairRDD<String, Long> regionVaccinationsPred = regionRegression.mapToPair(
-                line -> new Tuple2<>(line._1, (long) line._2.predict(timestampFirstMay2021)));
+                line -> new Tuple2<>(line._1, (long) line._2.predict(timestampFirstJune2021)));
 
         /*
          * Ottengo [(Regione, Vaccinazioni)] per ogni Regione ci sono tante coppie quante sono le date in cui

@@ -2,8 +2,7 @@ package it.uniroma2.ing.dicii.sabd.queries;
 
 import it.uniroma2.ing.dicii.sabd.utils.comparators.Tuple3Comparator;
 import it.uniroma2.ing.dicii.sabd.utils.io.HdfsIO;
-import it.uniroma2.ing.dicii.sabd.utils.wrappers.SimpleRegressionWrapper;
-import org.apache.commons.math3.stat.regression.SimpleRegression;
+import it.uniroma2.ing.dicii.sabd.utils.regression.SimpleRegressionWrapper;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
@@ -61,7 +60,7 @@ public class Query2 implements Query {
         this.log.info("Starting processing query");
         Instant start = Instant.now();
 
-        JavaRDD<Row> rawSummary = this.hdfsIO.readParquet(vaccineAdministrationFile);
+        JavaRDD<Row> rawSummary = this.hdfsIO.readParquetAsRDD(vaccineAdministrationFile);
         /*  Ottengo [(data, regione, età), vaccini]*/
         JavaPairRDD<Tuple3<Date, String, String>, Double> dateRegionAgeVaccinations = rawSummary.mapToPair(line ->{
             Date date = inputFormat.parse(line.getString(0));
@@ -102,7 +101,7 @@ public class Query2 implements Query {
                 monthRegionAgeDateVaccinations.mapToPair(
                         line -> {
                             SimpleRegressionWrapper simpleRegression = new SimpleRegressionWrapper();
-                            simpleRegression.addData((double) (line._2._1.getTime()), line._2._2);
+                            simpleRegression.addData((double) (line._2._1.getTime() / 1000), line._2._2);
                             return new Tuple2<>(line._1, simpleRegression);
                         });
 
@@ -123,7 +122,7 @@ public class Query2 implements Query {
                         stringFirstDayNextMonth = "2021-" + nextMonth + "-01";
                     }
                     Date dateFirstDayNextMonth = inputFormat.parse(stringFirstDayNextMonth);
-                    double predictedVaccinations = record._2.predict((double)(dateFirstDayNextMonth).getTime());
+                    double predictedVaccinations = record._2.predict((double)(dateFirstDayNextMonth).getTime() / 1000);
                     Tuple3<Date,String,Double> newKey = new Tuple3<>(dateFirstDayNextMonth, record._1._2(),predictedVaccinations);
                     String region = record._1._3();
                     return new Tuple2<>(newKey, region);

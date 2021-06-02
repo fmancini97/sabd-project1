@@ -1,8 +1,10 @@
-package it.uniroma2.ing.dicii.sabd.utils.wrappers;
+package it.uniroma2.ing.dicii.sabd.utils.regression;
 
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 
-public class SimpleRegressionWrapper extends SimpleRegression{
+import java.io.Serializable;
+
+public class SimpleRegressionWrapper extends SimpleRegression {
 
     private int counter;
 
@@ -20,7 +22,7 @@ public class SimpleRegressionWrapper extends SimpleRegression{
         if(y>0)
             counter++;
     }
-
+    
     public void append(SimpleRegressionWrapper simpleRegression){
         super.append(simpleRegression);
         counter = counter + simpleRegression.getCounter();

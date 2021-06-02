@@ -10,24 +10,26 @@ import org.apache.log4j.Logger;
 import org.apache.spark.sql.SparkSession;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class QueryExecutor {
+public class QueryExecutor implements Serializable {
 
     public static void main(String[] args) {
 
         Logger log = LogManager.getLogger("SABD Project");
         List<QueryBenchmark> queryBenchmarks = new ArrayList<>();
         HdfsIO hdfsIO = null;
-        QueryContext queryContext = new QueryContext();
-
         SparkSession spark = SparkSession
                 .builder()
                 .appName("SABD Project 1")
                 .getOrCreate();
+        QueryContext queryContext = new QueryContext(spark);
+
+
 
         try {
             hdfsIO = HdfsIO.createInstance(spark, "hdfs://hdfs-master:54310");
