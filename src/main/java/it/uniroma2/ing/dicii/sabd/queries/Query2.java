@@ -28,7 +28,7 @@ public class Query2 implements Query {
     private static final Date dateFirstFeb2021 = new GregorianCalendar(2021, Calendar.FEBRUARY, 1).getTime();
     private static final SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd");
     private static final SimpleDateFormat simpleMonthFormat = new SimpleDateFormat("MM");
-    private static final SimpleDateFormat outputFormat = new SimpleDateFormat("dd-MMMM", Locale.ITALIAN);
+    private static final SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd");
     private static final String vaccineAdministrationFile = "somministrazioni-vaccini-latest.parquet";
     private static final String resultFile = "query2Result";
 

@@ -25,7 +25,7 @@ public class Query1 implements Query {
     private static final Tuple2Comparator<Date, String> valuesComparator = new Tuple2Comparator<>(Comparator.<Date>naturalOrder(),
             Comparator.<String>naturalOrder());
     private static final Date firstJanuary = new GregorianCalendar(2021, Calendar.JANUARY, 1).getTime();
-    private static final SimpleDateFormat outputFormat = new SimpleDateFormat("MMMM yyyy", Locale.ITALIAN);
+    private static final SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd");
     private static final SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd");
     private static final String vaccineAdministrationSummaryFile = "somministrazioni-vaccini-summary-latest.parquet";
     private static final String vaccineCentersFile = "punti-somministrazione-tipologia.parquet";

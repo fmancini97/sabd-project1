@@ -38,11 +38,11 @@ public class Query3 implements Query {
     private static final String benchmarkFile = "query3Benchmark.csv";
 
     private static final StructType resultStruct = DataTypes.createStructType(Arrays.asList(
-                //    DataTypes.createStructField("algoritmo", DataTypes.StringType, false),
-                //    DataTypes.createStructField("k", DataTypes.IntegerType, false),
-                //    DataTypes.createStructField("stima percentuale popolazione vaccinata", DataTypes.DoubleType, false),
-                //    DataTypes.createStructField("stima numero vaccinazioni", DataTypes.LongType, false),
-                    DataTypes.createStructField("region", DataTypes.StringType, false),
+                    DataTypes.createStructField("algoritmo", DataTypes.StringType, false),
+                    DataTypes.createStructField("k", DataTypes.IntegerType, false),
+                    DataTypes.createStructField("regione", DataTypes.StringType, false),
+                    DataTypes.createStructField("stima percentuale popolazione vaccinata", DataTypes.DoubleType, false),
+                    DataTypes.createStructField("stima numero vaccinazioni", DataTypes.LongType, false),
                     DataTypes.createStructField("cluster", DataTypes.IntegerType, false)));
 
 
@@ -143,28 +143,29 @@ public class Query3 implements Query {
         JavaPairRDD<String, Long> regionVaccinationsTotal = regionVaccinations.reduceByKey(Long::sum);
 
         /*
-         * Ottengo [(Regione, PercentualeVaccinati)] per ogni Regione si tiene la stima per eccesso della percentuale
+         * Ottengo [(Regione, Numero Vaccinati, PercentualeVaccinati)] per ogni Regione si tiene la stima per eccesso della percentuale
          * della popolazione di quella regione vaccinata.
          * La lista è ordinata ordinando le regioni per ordine alfabetico.
          * La stima è per eccesso perché si calcola considerando il  rapporto tra le vaccinazioni e la popolazione, ma
          * così facendo si suppone che (1) tutte le vaccinazioni siano state somministrate a persone diverse e che
          * (2) questo abbia reso tali persone vaccinate. */
-        JavaPairRDD<String, Double> regionVaccinationsPercentage = regionVaccinationsTotal
+        JavaPairRDD<String, Tuple2<Long, Double>> regionVaccinationsPercentage = regionVaccinationsTotal
                 .join(regionPopulation)
-                .mapToPair(line -> new Tuple2<>(line._1, (double) line._2._1 / line._2._2));
+                .mapToPair(line -> new Tuple2<>(line._1, new Tuple2<>(line._2._1, (double) line._2._1 / line._2._2)));
 
         /*
-         * Ottengo [(Regione, PercentualeVaccinati)]. Il numero di vaccinati è messo all'interno di un oggetto Vector,
+         * Ottengo [(Regione, Numero vaccinati, PercentualeVaccinati, Vettore)]. Il numero di vaccinati è messo all'interno di un oggetto Vector,
          * utilizzato per eseguire l'algoritmo di KMeans
          */
-        JavaPairRDD<String, Vector> regionVaccinationsTotalVector = regionVaccinationsPercentage
-                .mapToPair(line -> new Tuple2<>(line._1, Vectors.dense(line._2)))
+        JavaPairRDD<String, Tuple3<Long, Double, Vector>> regionVaccinationsTotalVector = regionVaccinationsPercentage
+                .mapToPair(line -> new Tuple2<>(line._1, new Tuple3<>(line._2._1, line._2._2, Vectors.dense(line._2._2))))
                 .sortByKey()
                 .cache();
 
-        JavaRDD<Vector> dataset = regionVaccinationsTotalVector.map(line -> line._2).cache();
+        JavaRDD<Vector> dataset = regionVaccinationsTotalVector.map(line -> line._2._3()).cache();
 
-        List<Tuple3<KMeansType, Integer, JavaRDD<Row>>> results = new ArrayList<>();
+        //List<Tuple3<KMeansType, Integer, JavaRDD<Row>>> results = new ArrayList<>();
+        List<JavaRDD<Row>> results = new ArrayList<>();
         List<KMeansBenchmark> benchmarkResults = new ArrayList<>();
 
         for (KMeansType algorithm: KMeansType.values()) {
@@ -173,14 +174,19 @@ public class Query3 implements Query {
                 Class<?> cls = Class.forName(algorithm.getAlgorithmClass());
                 Constructor<?> constructor = cls.getConstructor();
                 for (int k = 2; k <= 5; k++) {
+                    Instant startTraining = Instant.now();
                     KMeansAlgorithm kMeansAlgorithm = (KMeansAlgorithm) constructor.newInstance();
                     kMeansAlgorithm.train(dataset, k, 10);
-                    JavaPairRDD<String, Integer> regionCluster = regionVaccinationsTotalVector.mapToPair(line ->
-                            new Tuple2<>(line._1, kMeansAlgorithm.predict(line._2)));
-                    JavaRDD<Row> regionClusterResult = regionCluster.map(line -> RowFactory.create(line._1, line._2));
-                    results.add(new Tuple3<>(algorithm, k, regionClusterResult));
+                    Instant endTraining = Instant.now();
+                    JavaPairRDD<String, Tuple3<Long,Double,Integer>> regionCluster = regionVaccinationsTotalVector.mapToPair(line ->
+                            new Tuple2<>(line._1, new Tuple3<>(line._2._1(), line._2._2(), kMeansAlgorithm.predict(line._2._3()))));
+                    int finalK = k;
+                    JavaRDD<Row> regionClusterResult = regionCluster.map(line -> RowFactory.create(algorithm.toString(),
+                            finalK, line._1, line._2._2(), line._2._1(), line._2._3()));
+                    results.add(regionClusterResult);
                     KMeansBenchmark benchmarkResult = new KMeansBenchmark(algorithm, k,
-                            kMeansAlgorithm.trainingCost(), kMeansAlgorithm.computeCost(dataset));
+                            Duration.between(startTraining,endTraining).toMillis(),
+                            kMeansAlgorithm.trainingCost());
                     benchmarkResults.add(benchmarkResult);
 
                 }
@@ -192,11 +198,13 @@ public class Query3 implements Query {
             }
         }
 
+        JavaRDD<Row> queryResult = results.remove(0);
+
         // Saving query results
-        for (Tuple3<KMeansType, Integer, JavaRDD<Row>> result: results) {
-            this.hdfsIO.saveRDDasCSV(result._3(), resultStruct,
-                    resultDir + "/" + result._1().toString() + "-" + result._2());
+        for (JavaRDD<Row> result: results) {
+            queryResult = queryResult.union(result);
         }
+        this.hdfsIO.saveRDDasCSV(queryResult, resultStruct, resultDir);
 
         // Saving Benchmark results
         try {

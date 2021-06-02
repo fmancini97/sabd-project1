@@ -34,7 +34,7 @@ elif [[ "${HDFS_MODE}" == "master" ]]; then
 	hdfs dfs -mkdir /sabd/output/query1Result
 	hdfs dfs -mkdir /sabd/output/query2Result
 	hdfs dfs -mkdir /sabd/output/query3Result
-	hdfs dfs -chown spark:spark /sabd/output
+	hdfs dfs -chown -R spark:spark /sabd/output
 	hdfs dfs -chown nifi:nifi /sabd/input
 	echo "Master node is up and running"
 else 
