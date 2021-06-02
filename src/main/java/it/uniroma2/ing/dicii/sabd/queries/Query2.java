@@ -21,11 +21,12 @@ import java.time.Instant;
 import java.util.*;
 
 
-public class Query2 implements Query {
+public class Query2 {
 
     private static final Tuple3Comparator<Date,String,Double> tuple3Comparator =
             new Tuple3Comparator<>(Comparator.<Date>naturalOrder(), Comparator.<String>naturalOrder(), Comparator.<Double>naturalOrder());
     private static final Date dateFirstFeb2021 = new GregorianCalendar(2021, Calendar.FEBRUARY, 1).getTime();
+    private static final Date dateFirstJun2021 = new GregorianCalendar(2021, Calendar.JUNE, 1).getTime();
     private static final SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd");
     private static final SimpleDateFormat simpleMonthFormat = new SimpleDateFormat("MM");
     private static final SimpleDateFormat outputFormat = new SimpleDateFormat("yyyy-MM-dd");
@@ -39,28 +40,12 @@ public class Query2 implements Query {
             DataTypes.createStructField("vaccinazioni previste", DataTypes.IntegerType, false)));
 
 
-    private final Logger log;
-
-    private QueryContext queryContext;
-    private HdfsIO hdfsIO;
-
-    public Query2() {
-        this.log = LogManager.getLogger(getClass().getSimpleName());
-    }
-
-    @Override
-    public void configure(QueryContext queryContext, HdfsIO hdfsIO) {
-        this.queryContext = queryContext;
-        this.hdfsIO = hdfsIO;
-    }
-
-    @Override
-    public Long execute() {
-
-        this.log.info("Starting processing query");
+    public static Long execute(QueryContext queryContext, HdfsIO hdfsIO) {
+        Logger log = LogManager.getLogger(Query2.class.getSimpleName());
+        log.info("Starting processing query");
         Instant start = Instant.now();
 
-        JavaRDD<Row> rawSummary = this.hdfsIO.readParquetAsRDD(vaccineAdministrationFile);
+        JavaRDD<Row> rawSummary = hdfsIO.readParquetAsRDD(vaccineAdministrationFile);
         /*  Ottengo [(data, regione, età), vaccini]*/
         JavaPairRDD<Tuple3<Date, String, String>, Double> dateRegionAgeVaccinations = rawSummary.mapToPair(line ->{
             Date date = inputFormat.parse(line.getString(0));
@@ -74,7 +59,7 @@ public class Query2 implements Query {
         /*  Ottengo i valori a partire dallo 2021-02-01 */
         dateRegionAgeVaccinations = dateRegionAgeVaccinations.filter(record -> {
             Date date = record._1._1();
-            return !(date.before(dateFirstFeb2021));
+            return !(date.before(dateFirstFeb2021)) && date.before(dateFirstJun2021);
         });
 
 
@@ -165,7 +150,7 @@ public class Query2 implements Query {
                 RowFactory.create(outputFormat.format(record._1._1._1()),
                         record._1._1._2(), record._1._2, record._1._1._3().intValue()));
 
-        this.hdfsIO.saveRDDasCSV(resultRow, resultStruct, resultFile);
+        hdfsIO.saveRDDasCSV(resultRow, resultStruct, resultFile);
 
         Instant end = Instant.now();
         Long duration = Duration.between(start, end).toMillis();

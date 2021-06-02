@@ -2,8 +2,6 @@ package it.uniroma2.ing.dicii.sabd.utils.regression;
 
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 
-import java.io.Serializable;
-
 public class SimpleRegressionWrapper extends SimpleRegression {
 
     private int counter;

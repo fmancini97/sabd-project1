@@ -1,6 +1,5 @@
 package it.uniroma2.ing.dicii.sabd;
 
-import it.uniroma2.ing.dicii.sabd.queries.Query;
 import it.uniroma2.ing.dicii.sabd.queries.QueryBenchmark;
 import it.uniroma2.ing.dicii.sabd.queries.QueryContext;
 import it.uniroma2.ing.dicii.sabd.queries.QueryType;
@@ -11,8 +10,8 @@ import org.apache.spark.sql.SparkSession;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,15 +41,13 @@ public class QueryExecutor implements Serializable {
         for (QueryType queryType: QueryType.values()) {
             try {
                 Class<?> cls = Class.forName(queryType.getQueryClass());
-                Constructor<?> constructor = cls.getConstructor();
-                Query query = (Query) constructor.newInstance();
-                query.configure(queryContext, hdfsIO);
-                Long executionTime = query.execute();
+                Method method = cls.getMethod("execute", QueryContext.class, HdfsIO.class);
+                Long executionTime = (Long) method.invoke(null, queryContext, hdfsIO);
                 queryBenchmarks.add(new QueryBenchmark(queryType, executionTime));
             } catch (ClassNotFoundException e) {
                 log.error("Class not found: " + e.getMessage());
-            } catch ( NoSuchMethodException | InvocationTargetException
-                    | InstantiationException | IllegalAccessException e) {
+            } catch ( NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
+                e.printStackTrace();
                 log.error(e.getMessage());
             }
         }

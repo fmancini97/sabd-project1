@@ -27,7 +27,7 @@ import java.time.Instant;
 import java.util.*;
 
 
-public class Query3 implements Query {
+public class Query3 {
 
     private static final Date dateFirstJune2021 = new GregorianCalendar(2021, Calendar.JUNE, 1).getTime();
     private static final long timestampFirstJune2021 = dateFirstJune2021.getTime() / 1000;
@@ -46,37 +46,22 @@ public class Query3 implements Query {
                     DataTypes.createStructField("cluster", DataTypes.IntegerType, false)));
 
 
-    private final Logger log;
-
-    private QueryContext queryContext;
-    private HdfsIO hdfsIO;
-
-    public Query3() {
-        this.log = LogManager.getLogger(getClass().getSimpleName());
-    }
-
-    @Override
-    public void configure(QueryContext queryContext, HdfsIO hdfsIO) {
-        this.queryContext = queryContext;
-        this.hdfsIO = hdfsIO;
-    }
-
-    @Override
-    public Long execute() {
+    public static Long execute(QueryContext queryContext, HdfsIO hdfsIO) {
+        Logger log = LogManager.getLogger(Query3.class.getSimpleName());
         log.info("Starting processing query");
         Instant start = Instant.now();
 
-        JavaRDD<Row> regionPopulationRaw = this.hdfsIO.readParquetAsRDD(populationPerRegion);
+        JavaRDD<Row> regionPopulationRaw = hdfsIO.readParquetAsRDD(populationPerRegion);
 
         /*  Ottengo [(Regione, Popolazione)] dal file totale-popolazione.parquet */
         JavaPairRDD<String,Long> regionPopulation = regionPopulationRaw.mapToPair(line ->
                 new Tuple2<>(line.getString(0).split(" /")[0], Long.parseLong(line.getString(1))));
 
-        JavaPairRDD<Date, Tuple2<String, Long>> parsedSummary = this.queryContext.getVaccineAdministrationSummary();
+        JavaPairRDD<Date, Tuple2<String, Long>> parsedSummary = queryContext.getVaccineAdministrationSummary();
 
         if (parsedSummary == null) {
             log.info("Not cached");
-            JavaRDD<Row> rawSummary = this.hdfsIO.readParquetAsRDD(vaccineAdministrationSummaryFile);
+            JavaRDD<Row> rawSummary = hdfsIO.readParquetAsRDD(vaccineAdministrationSummaryFile);
 
             parsedSummary = rawSummary
                     .mapToPair((row ->
@@ -84,7 +69,7 @@ public class Query3 implements Query {
                                     new Tuple2<>(row.getString(2).split(" /")[0], Long.parseLong(row.getString(1)) ))))
                     .sortByKey(true);
 
-            parsedSummary = this.queryContext.cacheVaccineAdministration(parsedSummary);
+            parsedSummary = queryContext.cacheVaccineAdministration(parsedSummary);
         }
 
         /*
@@ -204,11 +189,11 @@ public class Query3 implements Query {
         for (JavaRDD<Row> result: results) {
             queryResult = queryResult.union(result);
         }
-        this.hdfsIO.saveRDDasCSV(queryResult, resultStruct, resultDir);
+        hdfsIO.saveRDDasCSV(queryResult, resultStruct, resultDir);
 
         // Saving Benchmark results
         try {
-            this.hdfsIO.saveStructAsCSV(benchmarkResults, benchmarkFile);
+            hdfsIO.saveStructAsCSV(benchmarkResults, benchmarkFile);
         } catch (IOException e) {
            log.error("Error during benchmark saving: " + e.getMessage());
         }

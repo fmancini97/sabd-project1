@@ -13,36 +13,21 @@ import static org.apache.spark.sql.functions.lit;
 import static org.apache.spark.sql.functions.to_date;
 import static scala.collection.JavaConverters.asScalaBuffer;
 
-public class Query1SQL implements Query {
+public class Query1SQL {
 
-    private final Logger log;
     private static final String vaccineAdministrationSummaryFile = "somministrazioni-vaccini-summary-latest.parquet";
     private static final String vaccineCentersFile = "punti-somministrazione-tipologia.parquet";
     private static final String resultFile = "query1Result";
     private static final String firstJanuaryString = "2021-01-01";
-    private QueryContext queryContext;
-    private HdfsIO hdfsIO;
-    private SparkSession sparkSession;
 
-    public Query1SQL() {
-        this.log = LogManager.getLogger(getClass().getSimpleName());
-    }
+    public static Long execute(QueryContext queryContext, HdfsIO hdfsIO) {
 
-    @Override
-    public void configure(QueryContext queryContext, HdfsIO hdfsIO) {
-        this.queryContext = queryContext;
-        this.hdfsIO = hdfsIO;
-        this.sparkSession = queryContext.getSparkSession();
-    }
-
-    @Override
-    public Long execute() {
-
-
+        Logger log = LogManager.getLogger(Query1SQL.class.getSimpleName());
+        SparkSession sparkSession = queryContext.getSparkSession();
         log.info("Starting processing query");
         Instant start = Instant.now();
 
-        Dataset<Row> dataframe = this.hdfsIO.readParquetAsDataframe(vaccineAdministrationSummaryFile);
+        Dataset<Row> dataframe = hdfsIO.readParquetAsDataframe(vaccineAdministrationSummaryFile);
 
      //   dataframe = dataframe.withColumn("nome_area", functions.substring_index(dataframe.col("nome_area"), " /", 1));
         dataframe = dataframe.withColumn("data_somministrazione", to_date(dataframe.col("data_somministrazione")));
@@ -58,7 +43,7 @@ public class Query1SQL implements Query {
         dataframe = sparkSession.sql("SELECT anno_mese, nome_area, sum(totale) as totale_vaccinazioni" +
                 " FROM vaccineAdministrationSummary GROUP BY anno_mese, nome_area");
 
-        Dataset<Row> dataframeCenters = this.hdfsIO.readParquetAsDataframe(vaccineCentersFile);
+        Dataset<Row> dataframeCenters = hdfsIO.readParquetAsDataframe(vaccineCentersFile);
       //  dataframeCenters = dataframeCenters.withColumn("nome_area", functions.substring_index(dataframe.col("nome_area"), " /", 1));
         dataframeCenters.createOrReplaceTempView("vaccineCenters");
         dataframeCenters = sparkSession.sql("SELECT nome_area, count(*) as numero_centri FROM vaccineCenters" +

@@ -1,13 +1,19 @@
 package it.uniroma2.ing.dicii.sabd.utils.regression;
 
-public class LineParameters {
+import java.io.Serializable;
+
+public class LineParameters implements Serializable {
 
     private double slope;
     private double intercept;
+    private int counter;
 
-    public LineParameters(double slope, double intercept){
+    public LineParameters() {}
+
+    public LineParameters(double slope, double intercept, int counter){
         this.slope = slope;
         this.intercept = intercept;
+        this.counter = counter;
     }
 
     public double getSlope() {
@@ -26,6 +32,11 @@ public class LineParameters {
         this.intercept = intercept;
     }
 
+    public int getCounter() {
+        return counter;
+    }
 
-
+    public void setCounter(int counter) {
+        this.counter = counter;
+    }
 }
