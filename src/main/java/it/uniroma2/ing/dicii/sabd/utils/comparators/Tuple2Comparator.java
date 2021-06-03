@@ -1,10 +1,13 @@
 package it.uniroma2.ing.dicii.sabd.utils.comparators;
 
 import scala.Tuple2;
-
 import java.io.Serializable;
 import java.util.Comparator;
 
+/**
+ * Compares scala.Tuple2 objects
+ *
+ * */
 public class Tuple2Comparator<K,V> implements Comparator<Tuple2<K, V>>, Serializable {
 
     private final Comparator<K> comparatorK;

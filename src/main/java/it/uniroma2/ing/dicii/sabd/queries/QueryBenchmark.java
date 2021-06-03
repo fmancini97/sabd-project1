@@ -2,6 +2,10 @@ package it.uniroma2.ing.dicii.sabd.queries;
 
 import it.uniroma2.ing.dicii.sabd.utils.io.CSVAble;
 
+/**
+ * Holds information about query perfomance
+ *
+ * */
 public class QueryBenchmark implements CSVAble {
     private QueryType queryType;
     private Long queryTime;

@@ -12,13 +12,15 @@ import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import scala.Tuple2;
 import scala.Tuple3;
-
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
-
+/**
+ * Runs Query1 using Spark Core
+ *
+ * */
 public class Query1 {
 
     private static final Tuple2Comparator<Date, String> valuesComparator = new Tuple2Comparator<>(Comparator.<Date>naturalOrder(),
@@ -30,13 +32,18 @@ public class Query1 {
     private static final String vaccineCentersFile = "punti-somministrazione-tipologia.parquet";
     private static final String resultFile = "query1Result";
 
-
+    /**
+     * @param queryContext: object that holds information about sparkSession
+     * @param hdfsIO: object that handles IO with HDFS
+     *
+     * */
     public static Long execute(QueryContext queryContext, HdfsIO hdfsIO) {
         Logger log = LogManager.getLogger(Query1.class.getSimpleName());
         log.info("Starting processing query");
 
         Instant start = Instant.now();
 
+        // [(data, vaccinazioni, regione)]
         JavaPairRDD<Date, Tuple2<String, Long>> parsedSummary = queryContext.getVaccineAdministrationSummary();
 
         if (parsedSummary == null) {
@@ -53,7 +60,7 @@ public class Query1 {
 
         parsedSummary = parsedSummary.filter(row -> !row._1.before(firstJanuary));
 
-
+        // [k:(anno_mese, regione), v:(vaccinazioni, contatore)]
         JavaPairRDD<Tuple2<Date, String>, Tuple2<Long, Integer>> vaccinePerMonthArea = parsedSummary.mapToPair((line) -> {
             Calendar cal = Calendar.getInstance();
             cal.setTime(line._1);
@@ -61,26 +68,26 @@ public class Query1 {
             return new Tuple2<>(new Tuple2<>(cal.getTime(), line._2._1), new Tuple2<>(line._2._2, 1));
         }).reduceByKey((a,b) -> new Tuple2<>(a._1 + b._1, a._2 + b._2));
 
-        List<Tuple2<Tuple2<Date, String>, Tuple2<Long, Integer>>> results = vaccinePerMonthArea.collect();
-        for (Tuple2<Tuple2<Date, String>, Tuple2<Long, Integer>> result: results) {
-            log.info(result);
-        }
-
+        // [k:(anno_mese, regione), v:(vaccinazioni_giornaliere)]
         JavaPairRDD<Tuple2<Date, String>, Long> vaccinePerDayArea = vaccinePerMonthArea.mapToPair((line) ->
                 new Tuple2<>(line._1, line._2._1 / line._2._2));
 
+        // [k: regione, v:(data, vaccinazioni)]
         JavaPairRDD<String, Tuple2<Date, Long>> vaccinePerArea = vaccinePerDayArea.mapToPair((line) ->
                 new Tuple2<>(line._1._2, new Tuple2<>(line._1._1, line._2)));
 
 
         JavaRDD<Row> datasetCenters = hdfsIO.readParquetAsRDD(vaccineCentersFile);
 
+        // [k: regione, v: numero_centri]
         JavaPairRDD<String, Integer> vaccineCenters = datasetCenters.mapToPair((row) ->
                 new Tuple2<> (row.getString(0).split(" /")[0], 1)).reduceByKey(Integer::sum);
 
+        // [k: regione, v: ((data, vaccinazioni), numero_centri)]
         JavaPairRDD<String, Tuple2<Tuple2<Date, Long>, Integer>> vaccinePerAreaMonthCenters =
                 vaccinePerArea.join(vaccineCenters);
 
+        // [(data, regione, vaccinazioni)]
         JavaRDD<Row> result = vaccinePerAreaMonthCenters.mapToPair((line) ->
                 new Tuple2<>(new Tuple2<>(line._2._1._1, line._1), line._2._1._2 / line._2._2))
                 .sortByKey(valuesComparator)

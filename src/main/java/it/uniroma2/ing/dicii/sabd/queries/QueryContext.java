@@ -7,6 +7,10 @@ import scala.Tuple2;
 
 import java.util.Date;
 
+/**
+ * Holds information about execution environment
+ *
+ * */
 public class QueryContext {
     private JavaPairRDD<Date, Tuple2<String, Long>> vaccineAdministrationSummary;
     private final SparkSession sparkSession;

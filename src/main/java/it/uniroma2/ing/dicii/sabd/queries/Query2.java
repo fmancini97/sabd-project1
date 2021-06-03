@@ -14,13 +14,15 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import scala.Tuple2;
 import scala.Tuple3;
-
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
-
+/**
+ * Runs Query2 using Spark Core
+ *
+ * */
 public class Query2 {
 
     private static final Tuple3Comparator<Date,String,Double> tuple3Comparator =
@@ -39,14 +41,18 @@ public class Query2 {
             DataTypes.createStructField("regione", DataTypes.StringType, false),
             DataTypes.createStructField("vaccinazioni previste", DataTypes.IntegerType, false)));
 
-
+    /**
+     * @param queryContext: object that holds information about sparkSession
+     * @param hdfsIO: object that handles IO with HDFS
+     * */
     public static Long execute(QueryContext queryContext, HdfsIO hdfsIO) {
         Logger log = LogManager.getLogger(Query2.class.getSimpleName());
         log.info("Starting processing query");
         Instant start = Instant.now();
 
         JavaRDD<Row> rawSummary = hdfsIO.readParquetAsRDD(vaccineAdministrationFile);
-        /*  Ottengo [(data, regione, età), vaccini]*/
+
+        // [k:(data, regione, età), v: vaccini]
         JavaPairRDD<Tuple3<Date, String, String>, Double> dateRegionAgeVaccinations = rawSummary.mapToPair(line ->{
             Date date = inputFormat.parse(line.getString(0));
             String region = line.getString(3);
@@ -55,21 +61,19 @@ public class Query2 {
             return new Tuple2<>(new Tuple3<>(date,age,region), vaccinations);
         });
 
-
-        /*  Ottengo i valori a partire dallo 2021-02-01 */
         dateRegionAgeVaccinations = dateRegionAgeVaccinations.filter(record -> {
             Date date = record._1._1();
             return !(date.before(dateFirstFeb2021)) && date.before(dateFirstJun2021);
         });
 
 
-        /*  Ottengono l'unicità della chiave aggregando i valori con la stessa chiave
-         * Questi valori esistono a causa delle diverse marche di vaccini.*/
+        /* To obtain the uniqueness of the key,
+         * it is necessary to manage the existence of vaccines of different brands. */
         dateRegionAgeVaccinations = dateRegionAgeVaccinations.reduceByKey(Double::sum);
 
 
-        /*  Ottengo [(mese, regione, età),(data, vaccinazioni)]
-         * Le chiavi sono duplicate - i record con chiave duplicata differiscono sul valore data */
+        /* [k :(mese, regione, età),v: (data, vaccinazioni)]
+         * Keys are duplicated - records with the same key differ on the value "data". */
         JavaPairRDD<Tuple3<String, String, String>, Tuple2<Date,Double>> monthRegionAgeDateVaccinations =
                 dateRegionAgeVaccinations.mapToPair(
                         record -> {
@@ -82,6 +86,7 @@ public class Query2 {
                         }
                 );
 
+        // [k: (anno_mese, regione, fascia_anagrafica), v: regressore]
         JavaPairRDD<Tuple3<String, String, String>, SimpleRegressionWrapper> monthRegionAgeRegressor =
                 monthRegionAgeDateVaccinations.mapToPair(
                         line -> {
@@ -95,7 +100,7 @@ public class Query2 {
             return a;
         }).filter(line -> line._2.getCounter()>=2); // Filtering regressions which have less than 2 observations
 
-
+        // [k: (anno_mese, fascia_anagrafica, vaccinazioni), v: regione]
         JavaPairRDD<Tuple3<Date, String, Double>, String> dateAgePredictedVaccinationsRegion =
                 monthRegionAgeRegressor.mapToPair(record ->{
                     int month = Integer.parseInt(record._1._1());
@@ -117,6 +122,7 @@ public class Query2 {
                 .sortByKey(tuple3Comparator,false,1)
                 .cache();
 
+        //[(data, fascia_anagrafica)]
         List<Tuple2<Date,String>> dateAgeKeys = dateAgePredictedVaccinationsRegion.map(
                 record -> {
                     Date date = record._1._1();
@@ -127,7 +133,7 @@ public class Query2 {
                 .sortBy((Function<Tuple2<Date, String>, String>) value -> inputFormat.format(value._1())+value._2(),
                         true, 1)
                 .collect();
-
+        // [k: ((anno_mese, fascia_anagrafica, vaccinazioni_previste), regione), v: rank]
         JavaPairRDD<Tuple2<Tuple3<Date, String, Double>, String>, Long> resultsRDD = null;
         for(Tuple2<Date,String> key: dateAgeKeys) {
             JavaPairRDD<Tuple3<Date, String, Double>, String> filteredData = dateAgePredictedVaccinationsRegion

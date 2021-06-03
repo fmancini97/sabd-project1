@@ -2,6 +2,10 @@ package it.uniroma2.ing.dicii.sabd.kmeans;
 
 import it.uniroma2.ing.dicii.sabd.utils.io.CSVAble;
 
+/**
+ * Mantains K-Means performance metrics.
+ *
+ * */
 public class KMeansBenchmark implements CSVAble {
     private KMeansType kMeansType;
     private Integer k;

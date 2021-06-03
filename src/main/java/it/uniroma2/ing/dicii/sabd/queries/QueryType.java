@@ -1,6 +1,9 @@
 package it.uniroma2.ing.dicii.sabd.queries;
 
-
+/**
+ * Enumerate queries
+ *
+ * */
 public enum QueryType {
     QUERY1("Query1"),
     QUERY2("Query2"),

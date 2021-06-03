@@ -6,6 +6,10 @@ import scala.Tuple3;
 import java.io.Serializable;
 import java.util.Comparator;
 
+/**
+ * Compares scala.Tuple3 objects
+ *
+ * */
 public class Tuple3Comparator<T1, T2, T3> implements Comparator<Tuple3<T1, T2, T3>>, Serializable {
 
     private final Comparator<T1> comparatorT1;

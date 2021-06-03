@@ -2,6 +2,13 @@ package it.uniroma2.ing.dicii.sabd.utils.regression;
 
 import java.io.Serializable;
 
+/**
+ * Maintains information about regression line.
+ * Slope: slope of the regression line
+ * Intercept: intercept of the regression line
+ * Counter: number of points used to fit the regression line
+ *
+ * */
 public class LineParameters implements Serializable {
 
     private double slope;

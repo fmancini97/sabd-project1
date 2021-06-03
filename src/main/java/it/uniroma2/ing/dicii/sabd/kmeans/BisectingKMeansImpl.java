@@ -7,6 +7,10 @@ import org.apache.spark.mllib.linalg.Vector;
 
 import java.io.Serializable;
 
+/**
+ * Implementation of Bisecting K-Means
+ *
+ * */
 public class BisectingKMeansImpl extends KMeansAlgorithm implements Serializable {
     private BisectingKMeansModel model;
 

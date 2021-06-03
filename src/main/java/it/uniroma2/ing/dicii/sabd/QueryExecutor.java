@@ -15,6 +15,10 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Entry point for query execution.
+ *
+ * */
 public class QueryExecutor implements Serializable {
 
     public static void main(String[] args) {

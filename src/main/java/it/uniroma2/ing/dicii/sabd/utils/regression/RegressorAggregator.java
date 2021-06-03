@@ -5,10 +5,13 @@ import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.expressions.Aggregator;
 import scala.Tuple2;
 
+/**
+ * Describes how to perform regression starting from (date-long) pairs.
+ *
+ * */
 public class RegressorAggregator extends Aggregator<Tuple2<Long, Long>, SimpleRegressionWrapper, LineParameters> {
 
-
-    //Valore zero per l'aggregazione - dovrebbe soddisfare a+zero=a;
+    //Zero value for the regression, it should satisfy a+zero=a
     public SimpleRegressionWrapper zero(){
         return new SimpleRegressionWrapper();
     }

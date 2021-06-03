@@ -7,6 +7,10 @@ import org.apache.spark.mllib.linalg.Vector;
 
 import java.io.Serializable;
 
+/**
+ * Implementation of K-Means
+ *
+ * */
 public class KMeansImpl extends KMeansAlgorithm implements Serializable {
     private KMeansModel model;
 

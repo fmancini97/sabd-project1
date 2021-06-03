@@ -23,7 +23,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-
+/**
+ * Handles IO with HDFS
+ *
+ * */
 public class HdfsIO{
     private static final String projectDir = "/sabd";
     private static final String inputDir = projectDir + "/input";
@@ -38,6 +41,14 @@ public class HdfsIO{
         this.sparkSession = sparkSession;
         this.hdfsUrl = hdfsUrl;
         this.hdfs = hdfs;
+    }
+
+    public void saveDataframeAsCSV(Dataset<Row> dataframe, String filename){
+        dataframe.repartition(1).coalesce(1).write()
+                .format("csv")
+                .option("header", true)
+                .mode(SaveMode.Overwrite)
+                .save(this.hdfsUrl + outputDir + "/" + filename );
     }
 
     public void saveRDDasCSV(JavaRDD<Row> rows, StructType structType, String filename) {
