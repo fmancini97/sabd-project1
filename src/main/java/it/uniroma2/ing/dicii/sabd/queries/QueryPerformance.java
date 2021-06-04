@@ -3,14 +3,14 @@ package it.uniroma2.ing.dicii.sabd.queries;
 import it.uniroma2.ing.dicii.sabd.utils.io.CSVAble;
 
 /**
- * Holds information about query perfomance
+ * Holds information about query performance
  *
  * */
-public class QueryBenchmark implements CSVAble {
+public class QueryPerformance implements CSVAble {
     private QueryType queryType;
     private Long queryTime;
 
-    public QueryBenchmark(QueryType queryType, Long queryTime) {
+    public QueryPerformance(QueryType queryType, Long queryTime) {
         this.queryType = queryType;
         this.queryTime = queryTime;
     }
@@ -39,6 +39,6 @@ public class QueryBenchmark implements CSVAble {
 
     @Override
     public String getHeader() {
-        return "query,runtime";
+        return "query,runtime (ms)";
     }
 }

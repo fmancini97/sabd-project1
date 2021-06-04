@@ -3,17 +3,17 @@ package it.uniroma2.ing.dicii.sabd.kmeans;
 import it.uniroma2.ing.dicii.sabd.utils.io.CSVAble;
 
 /**
- * Mantains K-Means performance metrics.
+ * Maintains K-Means performance metrics.
  *
  * */
-public class KMeansBenchmark implements CSVAble {
+public class KMeansPerformance implements CSVAble {
     private KMeansType kMeansType;
     private Integer k;
     private Long trainingCost;
     private Double wssse;
 
 
-    public KMeansBenchmark(KMeansType kMeansType, Integer k, Long trainingCost, Double wssse) {
+    public KMeansPerformance(KMeansType kMeansType, Integer k, Long trainingCost, Double wssse) {
         this.kMeansType = kMeansType;
         this.k = k;
         this.trainingCost = trainingCost;

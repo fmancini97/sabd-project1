@@ -1,6 +1,6 @@
 package it.uniroma2.ing.dicii.sabd;
 
-import it.uniroma2.ing.dicii.sabd.queries.QueryBenchmark;
+import it.uniroma2.ing.dicii.sabd.queries.QueryPerformance;
 import it.uniroma2.ing.dicii.sabd.queries.QueryContext;
 import it.uniroma2.ing.dicii.sabd.queries.QueryType;
 import it.uniroma2.ing.dicii.sabd.utils.io.HdfsIO;
@@ -22,7 +22,7 @@ public class QueryExecutor {
 
     public static void main(String[] args) {
         Logger log = LogManager.getLogger("SABD Project");
-        List<QueryBenchmark> queryBenchmarks = new ArrayList<>();
+        List<QueryPerformance> queryPerformances = new ArrayList<>();
         HdfsIO hdfsIO = null;
         SparkSession spark = SparkSession
                 .builder()
@@ -30,8 +30,6 @@ public class QueryExecutor {
                 .config("spark.sql.shuffle.partitions", 20)
                 .getOrCreate();
         QueryContext queryContext = new QueryContext(spark);
-
-
 
         try {
             hdfsIO = HdfsIO.createInstance(spark, "hdfs://hdfs-master:54310");
@@ -46,7 +44,7 @@ public class QueryExecutor {
                 Class<?> cls = Class.forName(queryType.getQueryClass());
                 Method method = cls.getMethod("execute", QueryContext.class, HdfsIO.class);
                 Long executionTime = (Long) method.invoke(null, queryContext, hdfsIO);
-                queryBenchmarks.add(new QueryBenchmark(queryType, executionTime));
+                queryPerformances.add(new QueryPerformance(queryType, executionTime));
             } catch (ClassNotFoundException e) {
                 log.error("Class not found: " + e.getMessage());
             } catch ( NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
@@ -56,7 +54,7 @@ public class QueryExecutor {
         }
 
         try {
-            hdfsIO.saveStructAsCSV(queryBenchmarks, "queriesBenchmark.csv");
+            hdfsIO.saveStructAsCSV(queryPerformances, "queriesPerformance.csv");
         } catch (IOException e) {
             log.error("Error while saving queries benchmark: " + e.getMessage());
         }

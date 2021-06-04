@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS project1.query2_result (
 
 
 -- -----------------------------------------------------
--- Table `project1`.`query3_benchmark`
+-- Table `project1`.`query3_performance`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS project1.query3_benchmark (
+CREATE TABLE IF NOT EXISTS project1.query3_performance (
   algoritmo VARCHAR(32) NOT NULL,
   k INT NOT NULL,
   "costo addestramento (ms)" INT NULL DEFAULT NULL,

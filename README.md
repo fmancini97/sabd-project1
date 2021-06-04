@@ -75,8 +75,8 @@ Queries 1 and 2 are performed using both **Spark Core** and **Spark SQL**.
         +-- query1Result/
         +-- query2Result/
         +-- query3Result/
-        +-- query3Benchmark.csv
-        +-- queriesBenchmark.csv
+        +-- query3Performance.csv
+        +-- queriesPerformance.csv
 ```
 
 ## Results
@@ -87,6 +87,6 @@ The results reported are computed with the latest data (June 4, 2021 - 06:48 pm)
  - [Query 1 Result](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query1Result/query1Result.csv)
  - [Query 2 Result](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query2Result/query2Result.csv)
  - [Query 3 Result](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query3Result/query3Result.csv)
- - [Query 3 Benchmark](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query3Benchmark.csv)
- - [Queries Benchmark](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/queriesBenchmark.csv)
+ - [Query 3 Performance](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query3Performance.csv)
+ - [Queries Performance](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/queriesPerformance.csv)
 

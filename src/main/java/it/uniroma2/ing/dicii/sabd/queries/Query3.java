@@ -1,7 +1,7 @@
 package it.uniroma2.ing.dicii.sabd.queries;
 
 import it.uniroma2.ing.dicii.sabd.kmeans.KMeansAlgorithm;
-import it.uniroma2.ing.dicii.sabd.kmeans.KMeansBenchmark;
+import it.uniroma2.ing.dicii.sabd.kmeans.KMeansPerformance;
 import it.uniroma2.ing.dicii.sabd.kmeans.KMeansType;
 import it.uniroma2.ing.dicii.sabd.utils.io.HdfsIO;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
@@ -37,7 +37,7 @@ public class Query3 {
     private static final String vaccineAdministrationSummaryFile = "somministrazioni-vaccini-summary-latest.parquet";
     private static final String populationPerRegion = "totale-popolazione.parquet";
     private static final String resultDir = "query3Result";
-    private static final String benchmarkFile = "query3Benchmark.csv";
+    private static final String performanceFile = "query3Performance.csv";
 
     private static final StructType resultStruct = DataTypes.createStructType(Arrays.asList(
                     DataTypes.createStructField("algoritmo", DataTypes.StringType, false),
@@ -147,7 +147,7 @@ public class Query3 {
         JavaRDD<Vector> dataset = regionVaccinationsTotalVector.map(line -> line._2._3()).cache();
 
         List<JavaRDD<Row>> results = new ArrayList<>();
-        List<KMeansBenchmark> benchmarkResults = new ArrayList<>();
+        List<KMeansPerformance> performanceResults = new ArrayList<>();
 
         for (KMeansType algorithm: KMeansType.values()) {
             log.info("Algorithm: " + algorithm.toString());
@@ -166,10 +166,10 @@ public class Query3 {
                     JavaRDD<Row> regionClusterResult = regionCluster.map(line -> RowFactory.create(algorithm.toString(),
                             finalK, line._1, line._2._2(), line._2._1(), line._2._3()));
                     results.add(regionClusterResult);
-                    KMeansBenchmark benchmarkResult = new KMeansBenchmark(algorithm, k,
+                    KMeansPerformance benchmarkResult = new KMeansPerformance(algorithm, k,
                             Duration.between(startTraining,endTraining).toMillis(),
                             kMeansAlgorithm.trainingCost());
-                    benchmarkResults.add(benchmarkResult);
+                    performanceResults.add(benchmarkResult);
 
                 }
             } catch (ClassNotFoundException e) {
@@ -188,11 +188,11 @@ public class Query3 {
         }
         hdfsIO.saveRDDasCSV(queryResult, resultStruct, resultDir);
 
-        // Saving Benchmark results
+        // Saving performance results
         try {
-            hdfsIO.saveStructAsCSV(benchmarkResults, benchmarkFile);
+            hdfsIO.saveStructAsCSV(performanceResults, performanceFile);
         } catch (IOException e) {
-           log.error("Error during benchmark saving: " + e.getMessage());
+           log.error("Error during performance saving: " + e.getMessage());
         }
 
         Instant end = Instant.now();
