@@ -1,4 +1,4 @@
-query,runtime
+query,runtime (ms)
 QUERY1,5144
 QUERY2,2495
 QUERY3,6472
