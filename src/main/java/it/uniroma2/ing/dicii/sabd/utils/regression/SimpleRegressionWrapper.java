@@ -2,14 +2,13 @@ package it.uniroma2.ing.dicii.sabd.utils.regression;
 
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 
-import java.io.Serializable;
 
 /**
  * Wrapper for org.apache.commons.math3.stat.regression.SimpleRegression
  * Maintains the number of points added to the model.
  *
  * */
-public class SimpleRegressionWrapper extends SimpleRegression implements Serializable {
+public class SimpleRegressionWrapper extends SimpleRegression {
     private int counter;
 
     public SimpleRegressionWrapper(){

@@ -4,12 +4,12 @@ import it.uniroma2.ing.dicii.sabd.queries.QueryBenchmark;
 import it.uniroma2.ing.dicii.sabd.queries.QueryContext;
 import it.uniroma2.ing.dicii.sabd.queries.QueryType;
 import it.uniroma2.ing.dicii.sabd.utils.io.HdfsIO;
+import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.sql.SparkSession;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -19,16 +19,16 @@ import java.util.List;
  * Entry point for query execution.
  *
  * */
-public class QueryExecutor implements Serializable {
+public class QueryExecutor {
 
     public static void main(String[] args) {
-
         Logger log = LogManager.getLogger("SABD Project");
         List<QueryBenchmark> queryBenchmarks = new ArrayList<>();
         HdfsIO hdfsIO = null;
         SparkSession spark = SparkSession
                 .builder()
                 .appName("SABD Project 1")
+                .config("spark.sql.shuffle.partitions", 20)
                 .getOrCreate();
         QueryContext queryContext = new QueryContext(spark);
 

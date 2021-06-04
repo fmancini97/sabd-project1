@@ -44,7 +44,7 @@ public class HdfsIO{
     }
 
     public void saveDataframeAsCSV(Dataset<Row> dataframe, String filename){
-        dataframe.repartition(1).coalesce(1).write()
+        dataframe.write()
                 .format("csv")
                 .option("header", true)
                 .mode(SaveMode.Overwrite)

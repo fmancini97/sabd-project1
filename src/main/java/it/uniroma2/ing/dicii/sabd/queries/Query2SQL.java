@@ -103,7 +103,7 @@ public class Query2SQL {
         dataframe = dataframe.select(dataframe.col("data"), dataframe.col("fascia_anagrafica"),
                 dataframe.col("nome_area"), dataframe.col("vaccinazioni_previste")).where("rank <= 5");
 
-        dataframe.show(30, false);
+        //dataframe.show(30, false);
 
         hdfsIO.saveDataframeAsCSV(dataframe, resultFile);
 

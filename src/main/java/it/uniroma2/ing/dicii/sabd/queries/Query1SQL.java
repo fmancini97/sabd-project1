@@ -52,7 +52,6 @@ public class Query1SQL {
 
 
 
-
         UserDefinedFunction dateConverter = udf((Date data_somministrazione) -> {
             Calendar cal = Calendar.getInstance();
             cal.setTime(data_somministrazione);

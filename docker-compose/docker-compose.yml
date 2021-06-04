@@ -78,6 +78,9 @@ services:
       - ./nifi/conf:/opt/nifi/nifi-current/conf
       - nifi-archive:/opt/nifi/nifi-current/conf/archive
       - ./nifi/JDBCDriver:/JDBCDriver
+    depends_on:
+      - init-cockroach
+      - hdfs-master
 
   cockroach-1:
     image: cockroachdb/cockroach
@@ -111,6 +114,8 @@ services:
     container_name: grafana
     ports:
       - 3000:3000
+    volumes:
+      - ./grafana:/var/lib/grafana
 
 volumes:
   nifi-archive:

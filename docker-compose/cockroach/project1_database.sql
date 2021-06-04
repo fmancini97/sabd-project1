@@ -50,6 +50,6 @@ CREATE TABLE IF NOT EXISTS project1.query3_result (
   regione VARCHAR(32) NOT NULL,
   "stima percentuale popolazione vaccinata" DOUBLE PRECISION NULL DEFAULT NULL,
   "stima numero vaccinazioni" INT NULL DEFAULT NULL,
-  "cluster" VARCHAR(45) NULL DEFAULT NULL,
+  "cluster" INT NULL DEFAULT NULL,
   PRIMARY KEY (algoritmo, k, regione));
 
