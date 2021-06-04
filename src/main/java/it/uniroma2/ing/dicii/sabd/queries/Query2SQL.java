@@ -75,9 +75,9 @@ public class Query2SQL {
         dataframe.filter(dataframe.col("retta_regressione.counter").geq(2));
 
         // [(anno_mese, fascia_anagrafica, regione, (prossimo_mese,vaccinazioni_previste))]
-        UserDefinedFunction doPrediction = udf((String anno_mese, Row lineparameters) -> {
+        UserDefinedFunction doPrediction = udf((String yearMonth, Row lineparameters) -> {
             Calendar calendar = Calendar.getInstance();
-            calendar.setTime(simpleDateFormat.parse(anno_mese));
+            calendar.setTime(simpleDateFormat.parse(yearMonth));
             calendar.add(Calendar.MONTH, 1);
             calendar.set(Calendar.DAY_OF_MONTH, 1);
             long nextmonthMillis = calendar.getTimeInMillis();
@@ -103,7 +103,7 @@ public class Query2SQL {
         dataframe = dataframe.select(dataframe.col("data"), dataframe.col("fascia_anagrafica"),
                 dataframe.col("nome_area"), dataframe.col("vaccinazioni_previste")).where("rank <= 5");
 
-        //dataframe.show(30, false);
+
 
         hdfsIO.saveDataframeAsCSV(dataframe, resultFile);
 

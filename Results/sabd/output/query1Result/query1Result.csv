@@ -1,0 +1,127 @@
+data,regione,vaccinazioni per centro
+2021-01-01,Abruzzo,17
+2021-01-01,Basilicata,17
+2021-01-01,Calabria,13
+2021-01-01,Campania,104
+2021-01-01,Emilia-Romagna,41
+2021-01-01,Friuli-Venezia Giulia,25
+2021-01-01,Lazio,33
+2021-01-01,Liguria,11
+2021-01-01,Lombardia,85
+2021-01-01,Marche,24
+2021-01-01,Molise,47
+2021-01-01,Piemonte,26
+2021-01-01,Provincia Autonoma Bolzano,24
+2021-01-01,Provincia Autonoma Trento,36
+2021-01-01,Puglia,5
+2021-01-01,Sardegna,14
+2021-01-01,Sicilia,28
+2021-01-01,Toscana,18
+2021-01-01,Umbria,13
+2021-01-01,Valle d'Aosta,30
+2021-01-01,Veneto,26
+2021-02-01,Abruzzo,34
+2021-02-01,Basilicata,32
+2021-02-01,Calabria,19
+2021-02-01,Campania,142
+2021-02-01,Emilia-Romagna,43
+2021-02-01,Friuli-Venezia Giulia,36
+2021-02-01,Lazio,46
+2021-02-01,Liguria,14
+2021-02-01,Lombardia,115
+2021-02-01,Marche,34
+2021-02-01,Molise,58
+2021-02-01,Piemonte,34
+2021-02-01,Provincia Autonoma Bolzano,32
+2021-02-01,Provincia Autonoma Trento,54
+2021-02-01,Puglia,8
+2021-02-01,Sardegna,17
+2021-02-01,Sicilia,32
+2021-02-01,Toscana,30
+2021-02-01,Umbria,17
+2021-02-01,Valle d'Aosta,36
+2021-02-01,Veneto,27
+2021-03-01,Abruzzo,79
+2021-03-01,Basilicata,54
+2021-03-01,Calabria,50
+2021-03-01,Campania,275
+2021-03-01,Emilia-Romagna,104
+2021-03-01,Friuli-Venezia Giulia,63
+2021-03-01,Lazio,111
+2021-03-01,Liguria,36
+2021-03-01,Lombardia,260
+2021-03-01,Marche,91
+2021-03-01,Molise,176
+2021-03-01,Piemonte,62
+2021-03-01,Provincia Autonoma Bolzano,37
+2021-03-01,Provincia Autonoma Trento,109
+2021-03-01,Puglia,18
+2021-03-01,Sardegna,54
+2021-03-01,Sicilia,79
+2021-03-01,Toscana,57
+2021-03-01,Umbria,58
+2021-03-01,Valle d'Aosta,48
+2021-03-01,Veneto,87
+2021-04-01,Abruzzo,124
+2021-04-01,Basilicata,94
+2021-04-01,Calabria,84
+2021-04-01,Campania,531
+2021-04-01,Emilia-Romagna,161
+2021-04-01,Friuli-Venezia Giulia,101
+2021-04-01,Lazio,157
+2021-04-01,Liguria,68
+2021-04-01,Lombardia,492
+2021-04-01,Marche,159
+2021-04-01,Molise,218
+2021-04-01,Piemonte,112
+2021-04-01,Provincia Autonoma Bolzano,70
+2021-04-01,Provincia Autonoma Trento,177
+2021-04-01,Puglia,36
+2021-04-01,Sardegna,96
+2021-04-01,Sicilia,113
+2021-04-01,Toscana,96
+2021-04-01,Umbria,97
+2021-04-01,Valle d'Aosta,105
+2021-04-01,Veneto,120
+2021-05-01,Abruzzo,193
+2021-05-01,Basilicata,147
+2021-05-01,Calabria,149
+2021-05-01,Campania,972
+2021-05-01,Emilia-Romagna,206
+2021-05-01,Friuli-Venezia Giulia,162
+2021-05-01,Lazio,255
+2021-05-01,Liguria,69
+2021-05-01,Lombardia,726
+2021-05-01,Marche,194
+2021-05-01,Molise,291
+2021-05-01,Piemonte,143
+2021-05-01,Provincia Autonoma Bolzano,103
+2021-05-01,Provincia Autonoma Trento,239
+2021-05-01,Puglia,54
+2021-05-01,Sardegna,137
+2021-05-01,Sicilia,200
+2021-05-01,Toscana,134
+2021-05-01,Umbria,129
+2021-05-01,Valle d'Aosta,132
+2021-05-01,Veneto,174
+2021-06-01,Abruzzo,162
+2021-06-01,Basilicata,150
+2021-06-01,Calabria,98
+2021-06-01,Campania,827
+2021-06-01,Emilia-Romagna,151
+2021-06-01,Friuli-Venezia Giulia,151
+2021-06-01,Lazio,229
+2021-06-01,Liguria,69
+2021-06-01,Lombardia,537
+2021-06-01,Marche,186
+2021-06-01,Molise,290
+2021-06-01,Piemonte,117
+2021-06-01,Provincia Autonoma Bolzano,74
+2021-06-01,Provincia Autonoma Trento,186
+2021-06-01,Puglia,46
+2021-06-01,Sardegna,117
+2021-06-01,Sicilia,183
+2021-06-01,Toscana,110
+2021-06-01,Umbria,95
+2021-06-01,Valle d'Aosta,130
+2021-06-01,Veneto,137

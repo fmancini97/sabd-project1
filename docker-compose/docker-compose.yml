@@ -46,6 +46,8 @@ services:
     ports:
       - 9870:9870
       - 54310:54310
+    volumes:
+      - ./data:/tmp/data
 
   hdfs-worker-1:
     build:
