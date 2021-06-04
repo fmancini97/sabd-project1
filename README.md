@@ -86,5 +86,5 @@ Results are stored in [*Results*](https://github.com/fmancini97/sabd-project1/tr
  - [Query 2 Result](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query2Result/query2Result.csv)
  - [Query 3 Result](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query3Result/query3Result.csv)
  - [Query 3 Benchmark](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query3Benchmark.csv)
- - [Query Benchmark](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/queriesBenchmark.csv)
+ - [Queries Benchmark](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/queriesBenchmark.csv)
 
