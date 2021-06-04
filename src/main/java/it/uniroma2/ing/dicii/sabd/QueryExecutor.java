@@ -4,7 +4,6 @@ import it.uniroma2.ing.dicii.sabd.queries.QueryBenchmark;
 import it.uniroma2.ing.dicii.sabd.queries.QueryContext;
 import it.uniroma2.ing.dicii.sabd.queries.QueryType;
 import it.uniroma2.ing.dicii.sabd.utils.io.HdfsIO;
-import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.sql.SparkSession;
