@@ -80,4 +80,11 @@ Queries 1 and 2 are performed using both **Spark Core** and **Spark SQL**.
 ```
 
 ## Results
-Results are stored in *Results* folder.
+Results are stored in [*Results*](https://github.com/fmancini97/sabd-project1/tree/main/Results/sabd/output) folder.
+
+ - [Query 1 Result](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query1Result/query1Result.csv)
+ - [Query 2 Result](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query2Result/query2Result.csv)
+ - [Query 3 Result](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query3Result/query3Result.csv)
+ - [Query 3 Benchmark](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/query3Benchmark.csv)
+ - [Query Benchmark](https://github.com/fmancini97/sabd-project1/blob/main/Results/sabd/output/queriesBenchmark.csv)
+
