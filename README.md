@@ -18,6 +18,7 @@ mvn package
 Project deployment is done using docker containers managed by docker compose.
 ```shell
 cd ./docker-compose
+chmod -R o+rwx ./grafana/
 docker-compose up --scale spark-worker=<number of replicas>
 ```
 
